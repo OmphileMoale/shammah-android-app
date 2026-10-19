@@ -1,0 +1,1805 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#140812"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
+
+    <LinearLayout
+
+        android:id="@+id/splashScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#3D0C2F"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <ImageView
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:src="@drawable/church_logo"
+            android:scaleType="centerCrop"
+            android:contentDescription="Shammah Urban Church Logo" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:text="SHAMMAH\nURBAN CHURCH"
+            android:textColor="#C9A84C"
+            android:textSize="27sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:layout_width="180dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="35dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/welcomeScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#140812"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="28dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:src="@drawable/church_logo"
+            android:scaleType="centerCrop"
+            android:contentDescription="Shammah Urban Church Logo" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="Welcome to CMES"
+            android:textColor="#C9A84C"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="Shammah Urban Church\nPretoria East\nLeader: Kay Smith"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/goCreateBtn"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="35dp"
+            android:backgroundTint="#C9A84C"
+            android:text="CREATE ACCOUNT"
+            android:textColor="#3D0C2F"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/goLoginBtn"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="#3D0C2F"
+            android:text="LOGIN"
+            android:textColor="#C9A84C"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/createAccountScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="25dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="Create Account"
+                android:textColor="#C9A84C"
+                android:textSize="30sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/createNameInput"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="25dp"
+                android:background="#2A1427"
+                android:hint="Full Name"
+                android:padding="15dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#C9B8C3" />
+
+            <EditText
+                android:id="@+id/createEmailInput"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="12dp"
+                android:background="#2A1427"
+                android:hint="Email Address"
+                android:inputType="textEmailAddress"
+                android:padding="15dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#C9B8C3" />
+
+            <EditText
+                android:id="@+id/createPhoneInput"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="12dp"
+                android:background="#2A1427"
+                android:hint="Phone Number"
+                android:inputType="phone"
+                android:padding="15dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#C9B8C3" />
+
+            <EditText
+                android:id="@+id/createPasswordInput"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="12dp"
+                android:background="#2A1427"
+                android:hint="Password"
+                android:inputType="textPassword"
+                android:padding="15dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#C9B8C3" />
+
+            <Spinner
+                android:id="@+id/roleSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="12dp"
+                android:background="#FFFFFF" />
+
+            <Button
+                android:id="@+id/createAccountBtn"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="18dp"
+                android:backgroundTint="#C9A84C"
+                android:text="CREATE ACCOUNT"
+                android:textColor="#3D0C2F"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/googleSignUpBtn"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#FFFFFF"
+                android:text="SIGN UP WITH GOOGLE"
+                android:textColor="#3D0C2F"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/backCreateBtn"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#3D0C2F"
+                android:text="BACK"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </ScrollView>
+
+    <ScrollView
+        android:id="@+id/loginScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="25dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="Login"
+                android:textColor="#C9A84C"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/emailInput"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="35dp"
+                android:background="#2A1427"
+                android:hint="Email Address"
+                android:inputType="textEmailAddress"
+                android:padding="15dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#C9B8C3" />
+
+            <EditText
+                android:id="@+id/passwordInput"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="14dp"
+                android:background="#2A1427"
+                android:hint="Password"
+                android:inputType="textPassword"
+                android:padding="15dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#C9B8C3" />
+
+            <Button
+                android:id="@+id/signInBtn"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="18dp"
+                android:backgroundTint="#C9A84C"
+                android:text="SIGN IN"
+                android:textColor="#3D0C2F"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/googleSignInBtn"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#FFFFFF"
+                android:text="SIGN IN WITH GOOGLE"
+                android:textColor="#3D0C2F"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/backLoginBtn"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#3D0C2F"
+                android:text="BACK"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/scriptureScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#25051D"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="26dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/scriptureText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#2A1427"
+            android:gravity="center"
+            android:padding="24dp"
+            android:text="Loading scripture..."
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="italic" />
+
+        <Button
+            android:id="@+id/continueToAppBtn"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="28dp"
+            android:backgroundTint="#C9A84C"
+            android:text="CONTINUE TO APP"
+            android:textColor="#3D0C2F"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/mainApp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <ScrollView
+                android:id="@+id/homeScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <ImageView
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_gravity="center"
+                        android:layout_marginBottom="8dp"
+                        android:src="@drawable/church_logo"
+                        android:scaleType="centerCrop"
+                        android:contentDescription="Shammah Urban Church Logo" />
+
+                    <TextView
+                        android:id="@+id/welcomeNameText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="22dp"
+                        android:textColor="#C9A84C"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="CHURCH LEADERSHIP\n\nSenior Leader\nKay Smith\n\nCampus Location\nPretoria East\n\nService Times\nSunday • 9:00 AM\nMonday Men's Prayer • 18:00 PM\nWednesday Women's Prayer • 18:00 PM"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <Button
+                        android:id="@+id/openPrayerBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="18dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="OPEN PRAYER WALL"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/openJournalBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="OPEN JOURNAL"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <ScrollView
+                android:id="@+id/eventsScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:id="@+id/eventStatusText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="RSVP Status: Not attending yet"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:background="#3D0C2F"
+                        android:padding="18dp"
+                        android:text="UPCOMING EVENTS\n\nMonday Men's Prayer\n18:00 - 19:00\nHosted by Babatude S\n\nWednesday Women's Prayer\n18:00 - 20:00\nHosted by Monicca M\nLive Streaming Available\n\nSunday Celebration Service\n09:00 AM\nPretoria East Campus"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/eventsDbText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="ALL CHURCH EVENTS"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                    <Button
+                        android:id="@+id/liveStreamBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#FF0000"
+                        android:text="WATCH LIVE STREAM ON YOUTUBE"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/podcastBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="#6A0DAD"
+                        android:text="🎧  LISTEN TO SERMON PODCAST"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/rsvpBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="RSVP FOR SUNDAY SERVICE"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <ScrollView
+                android:id="@+id/giveScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="22dp"
+                        android:text="Give"
+                        android:textColor="#C9A84C"
+                        android:textSize="25sp"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/donationCategorySpinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="16dp"
+                        android:background="#FFFFFF" />
+
+                    <EditText
+                        android:id="@+id/donationAmount"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="16dp"
+                        android:background="#2A1427"
+                        android:hint="Amount"
+                        android:inputType="numberDecimal"
+                        android:padding="15dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#C9B8C3" />
+
+                    <Button
+                        android:id="@+id/donateBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="16dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="RECORD DONATION"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/donationHistoryText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="DONATION HISTORY"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:background="#3D0C2F"
+                        android:padding="18dp"
+                        android:text="EFT BANKING DETAILS\n\nBank: Standard Bank\nAccount Name: Shammah Urban Church\nAccount Number: 123456789\nBranch Code: 051001\nReference: Your Name + Donation"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                    <Button
+                        android:id="@+id/copyBankBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="COPY EFT DETAILS"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/payOnlineBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#00A651"
+                        android:text="CLICK HERE TO PAY ONLINE"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <ScrollView
+                android:id="@+id/groupsScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="MY GROUPS\n\nPretoria East Cell Group\nMeets: Wednesdays • Pretoria East Campus\nLeader: Monicca K\n42 Active Members\n\nYouth Group\nFridays • 18:00\nLeader: Daniel T\nFor young people, fellowship and growth\n\nMen Group\nMondays • 18:00\nLeader: Babatude S\nPrayer, mentorship and brotherhood"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/groupsDbText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="ALL CHURCH GROUPS"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                    <Button
+                        android:id="@+id/joinGroupBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="16dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="JOIN CHURCH GROUP"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <ScrollView
+                android:id="@+id/profileScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:id="@+id/profileInfoText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="Profile"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <Button
+                        android:id="@+id/openSettingsBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="20dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="SETTINGS"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/openHelpBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="HELP &amp; USER GUIDE"
+                        android:textColor="#C9A84C"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/logoutBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="20dp"
+                        android:backgroundTint="#8B0000"
+                        android:text="SIGN OUT"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <ScrollView
+                android:id="@+id/pastorDashboard"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="22dp"
+                        android:text="PASTOR'S DASHBOARD"
+                        android:textColor="#C9A84C"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/pastorWelcomeText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="Welcome, Pastor\nManage your congregation and services here."
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/manageMembersBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="100dp"
+                            android:layout_marginEnd="5dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="#C9A84C"
+                            android:text="MANAGE\nMEMBERS"
+                            android:textColor="#3D0C2F"
+                            android:textStyle="bold" />
+
+                        <Button
+                            android:id="@+id/viewDonationsBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="100dp"
+                            android:layout_marginStart="5dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="#C9A84C"
+                            android:text="VIEW\nDONATIONS"
+                            android:textColor="#3D0C2F"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/approvePrayersBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="APPROVE PRAYER REQUESTS"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:background="#3D0C2F"
+                        android:padding="18dp"
+                        android:text="ADMIN ANNOUNCEMENTS\n\n• Board meeting on Monday at 10 AM\n• Youth retreat planning for next month\n• Monthly financial report due Friday"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- Manage Members Screen -->
+            <ScrollView
+                android:id="@+id/manageMembersScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="MEMBERSHIP DIRECTORY"
+                        android:textColor="#C9A84C"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginBottom="15dp"/>
+                    <TextView
+                        android:id="@+id/memberListText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:background="#2A1427"
+                        android:padding="15dp"
+                        android:text="Loading..."/>
+                    <Button
+                        android:id="@+id/backFromMembersBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="20dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO DASHBOARD"
+                        android:textColor="#C9A84C"/>
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- View Donations Screen -->
+            <ScrollView
+                android:id="@+id/viewDonationsScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="CHURCH FINANCE REPORT"
+                        android:textColor="#C9A84C"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginBottom="15dp"/>
+                    <TextView
+                        android:id="@+id/donationStatsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:background="#3D0C2F"
+                        android:padding="10dp"
+                        android:layout_marginBottom="10dp"
+                        android:text="Total This Week: R0\nTotal Last Week: R4000"/>
+                    <TextView
+                        android:id="@+id/allDonationsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:background="#2A1427"
+                        android:padding="15dp"
+                        android:text="No data available"/>
+                    <Button
+                        android:id="@+id/backFromDonationsBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="20dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO DASHBOARD"
+                        android:textColor="#C9A84C"/>
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- Approve Prayer Screen -->
+            <ScrollView
+                android:id="@+id/approvePrayersScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="PRAYER APPROVAL WALL"
+                        android:textColor="#C9A84C"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginBottom="15dp"/>
+                    <LinearLayout
+                        android:id="@+id/pendingPrayersContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"/>
+                    <Button
+                        android:id="@+id/backFromApproveBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="20dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO DASHBOARD"
+                        android:textColor="#C9A84C"/>
+                </LinearLayout>
+            </ScrollView>
+
+            <ScrollView
+                android:id="@+id/prayerScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <EditText
+                        android:id="@+id/prayerInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp"
+                        android:background="#2A1427"
+                        android:gravity="top"
+                        android:hint="Type your prayer request..."
+                        android:padding="15dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#C9B8C3" />
+
+                    <Button
+                        android:id="@+id/submitPrayerBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="SUBMIT PRAYER REQUEST"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/prayerListText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="Prayer Wall\n\nHealing for my mother\nMbali M.\n34 praying for this"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+                </LinearLayout>
+            </ScrollView>
+
+            <ScrollView
+                android:id="@+id/journalScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <EditText
+                        android:id="@+id/journalInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="180dp"
+                        android:background="#2A1427"
+                        android:gravity="top"
+                        android:hint="Write your reflection here..."
+                        android:padding="15dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#C9B8C3" />
+
+                    <Button
+                        android:id="@+id/saveJournalBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="16dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="SAVE ENTRY"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/journalListText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:background="#2A1427"
+                        android:padding="18dp"
+                        android:text="PAST JOURNAL ENTRIES"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- CARD PAYMENT SCREEN -->
+            <ScrollView
+                android:id="@+id/cardPaymentScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="22dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="20dp"
+                        android:text="💳  CARD PAYMENT"
+                        android:textColor="#C9A84C"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center"
+                        android:text="Secure payment powered by Yoco"
+                        android:textColor="#C9B8C3"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:text="Cardholder Name"
+                        android:textColor="#C9A84C"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <EditText
+                        android:id="@+id/cardHolderName"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="6dp"
+                        android:background="#2A1427"
+                        android:hint="e.g. Kay Smith"
+                        android:inputType="textPersonName|textCapWords"
+                        android:padding="15dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#C9B8C3" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="Card Number"
+                        android:textColor="#C9A84C"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <EditText
+                        android:id="@+id/cardNumber"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="6dp"
+                        android:background="#2A1427"
+                        android:hint="1234  5678  9012  3456"
+                        android:inputType="number"
+                        android:maxLength="16"
+                        android:padding="15dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#C9B8C3" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal"
+                        android:weightSum="2">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Expiry Month"
+                                android:textColor="#C9A84C"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <Spinner
+                                android:id="@+id/cardExpiryMonth"
+                                android:layout_width="match_parent"
+                                android:layout_height="55dp"
+                                android:layout_marginTop="6dp"
+                                android:background="#FFFFFF"
+                                android:popupBackground="#2A1427" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Expiry Year"
+                                android:textColor="#C9A84C"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <Spinner
+                                android:id="@+id/cardExpiryYear"
+                                android:layout_width="match_parent"
+                                android:layout_height="55dp"
+                                android:layout_marginTop="6dp"
+                                android:background="#FFFFFF"
+                                android:popupBackground="#2A1427" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="CVV"
+                        android:textColor="#C9A84C"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <EditText
+                        android:id="@+id/cardCvv"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="6dp"
+                        android:background="#2A1427"
+                        android:hint="123"
+                        android:inputType="numberPassword"
+                        android:maxLength="4"
+                        android:padding="15dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#C9B8C3" />
+
+                    <TextView
+                        android:id="@+id/cardPaymentAmountLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:background="#2A1427"
+                        android:gravity="center"
+                        android:padding="14dp"
+                        android:text="Amount: R0.00"
+                        android:textColor="#C9A84C"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/confirmCardPayBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="18dp"
+                        android:backgroundTint="#00A651"
+                        android:text="PAY NOW"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/backFromCardBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK"
+                        android:textColor="#C9A84C"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- SETTINGS HUB: four buttons, words only -->
+            <ScrollView
+                android:id="@+id/settingsScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center"
+                        android:text="SETTINGS"
+                        android:textColor="#C9A84C"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/openNotificationsSettingBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="60dp"
+                        android:layout_marginTop="24dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="NOTIFICATIONS"
+                        android:textColor="#3D0C2F"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/openAppearanceSettingBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="60dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="APPEARANCE &amp; DISPLAY"
+                        android:textColor="#3D0C2F"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/openSecuritySettingBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="60dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="SECURITY &amp; ACCOUNT"
+                        android:textColor="#3D0C2F"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/openHelpSupportSettingBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="60dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="HELP &amp; SUPPORT"
+                        android:textColor="#3D0C2F"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/backFromSettingsBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="28dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO PROFILE"
+                        android:textColor="#C9A84C"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- NOTIFICATIONS -->
+            <ScrollView
+                android:id="@+id/notificationsSettingScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="18dp"
+                        android:text="NOTIFICATIONS"
+                        android:textColor="#C9A84C"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/notificationsInfoText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:background="#2A1427"
+                        android:lineSpacingExtra="3dp"
+                        android:padding="16dp"
+                        android:text="About Notifications\n\nStay connected with Shammah Urban Church. Choose which alerts you want to receive on this device."
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="ALERT TYPES"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#2A1427"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <Switch
+                            android:id="@+id/settingNotifications"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:text="General push notifications"
+                            android:textColor="#FFFFFF" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Master switch for all church alerts."
+                            android:textColor="#C9B8C3"
+                            android:textSize="12sp" />
+
+                        <Switch
+                            android:id="@+id/settingEventReminders"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="10dp"
+                            android:text="Service &amp; event reminders"
+                            android:textColor="#FFFFFF" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Sunday service, cell group and prayer meeting reminders."
+                            android:textColor="#C9B8C3"
+                            android:textSize="12sp" />
+
+                        <Switch
+                            android:id="@+id/settingPrayerAlerts"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="10dp"
+                            android:text="Prayer request updates"
+                            android:textColor="#FFFFFF" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Know when your prayer request is approved."
+                            android:textColor="#C9B8C3"
+                            android:textSize="12sp" />
+
+                        <Switch
+                            android:id="@+id/settingDonationReceipts"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="10dp"
+                            android:text="Donation receipts"
+                            android:textColor="#FFFFFF" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Instant digital receipt for tithes and offerings."
+                            android:textColor="#C9B8C3"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/saveNotificationsBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="18dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="SAVE PREFERENCES"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/backFromNotificationsBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO SETTINGS"
+                        android:textColor="#C9A84C"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- APPEARANCE & DISPLAY -->
+            <ScrollView
+                android:id="@+id/appearanceSettingScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="18dp"
+                        android:text="APPEARANCE &amp; DISPLAY"
+                        android:textColor="#C9A84C"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/appearanceInfoText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:background="#2A1427"
+                        android:lineSpacingExtra="3dp"
+                        android:padding="16dp"
+                        android:text="About Appearance\n\nPersonalise how the app looks and reads. Larger text and high contrast make the app easier to use."
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="DISPLAY OPTIONS"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#2A1427"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <Switch
+                            android:id="@+id/settingScripture"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:text="Daily scripture after sign in"
+                            android:textColor="#FFFFFF" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Show an inspirational verse before the home screen."
+                            android:textColor="#C9B8C3"
+                            android:textSize="12sp" />
+
+                        <Switch
+                            android:id="@+id/settingDarkMode"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="10dp"
+                            android:text="High-contrast dark theme"
+                            android:textColor="#FFFFFF" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Stronger colour contrast for easier reading."
+                            android:textColor="#C9B8C3"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="TEXT SIZE"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/settingTextSize"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="8dp"
+                        android:background="#FFFFFF" />
+
+                    <Button
+                        android:id="@+id/saveAppearanceBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="18dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="SAVE SETTINGS"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/backFromAppearanceBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO SETTINGS"
+                        android:textColor="#C9A84C"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- SECURITY & ACCOUNT -->
+            <ScrollView
+                android:id="@+id/securitySettingScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="18dp"
+                        android:text="SECURITY &amp; ACCOUNT"
+                        android:textColor="#C9A84C"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/securityInfoText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:background="#2A1427"
+                        android:lineSpacingExtra="3dp"
+                        android:padding="16dp"
+                        android:text="Privacy Protection\n\n• Passwords are never stored in plain text\n• They are protected with salted PBKDF2-HmacSHA256 hashing\n• Passwords need at least 8 characters, including a letter and a number"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:text="EDIT PROFILE"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#2A1427"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <EditText
+                            android:id="@+id/settingName"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:background="#3A1F36"
+                            android:hint="Full name"
+                            android:inputType="textPersonName"
+                            android:padding="15dp"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#C9B8C3" />
+
+                        <EditText
+                            android:id="@+id/settingPhone"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="8dp"
+                            android:background="#3A1F36"
+                            android:hint="Phone number"
+                            android:inputType="phone"
+                            android:padding="15dp"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#C9B8C3" />
+
+                        <Button
+                            android:id="@+id/saveProfileBtn"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="10dp"
+                            android:backgroundTint="#C9A84C"
+                            android:text="SAVE PROFILE"
+                            android:textColor="#3D0C2F"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:text="CHANGE PASSWORD"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#2A1427"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <EditText
+                            android:id="@+id/oldPasswordInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:background="#3A1F36"
+                            android:hint="Current password"
+                            android:inputType="textPassword"
+                            android:padding="15dp"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#C9B8C3" />
+
+                        <EditText
+                            android:id="@+id/newPasswordInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="8dp"
+                            android:background="#3A1F36"
+                            android:hint="New password (min 8 characters)"
+                            android:inputType="textPassword"
+                            android:padding="15dp"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#C9B8C3" />
+
+                        <Button
+                            android:id="@+id/changePasswordBtn"
+                            android:layout_width="match_parent"
+                            android:layout_height="55dp"
+                            android:layout_marginTop="10dp"
+                            android:backgroundTint="#C9A84C"
+                            android:text="CHANGE PASSWORD"
+                            android:textColor="#3D0C2F"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/backFromSecurityBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="18dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO SETTINGS"
+                        android:textColor="#C9A84C"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- HELP & SUPPORT -->
+            <ScrollView
+                android:id="@+id/helpScreen"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="18dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#3D0C2F"
+                        android:gravity="center"
+                        android:padding="18dp"
+                        android:text="HELP &amp; SUPPORT"
+                        android:textColor="#C9A84C"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="20dp"
+                        android:text="CONTACT THE CHURCH OFFICE"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/helpText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#2A1427"
+                        android:lineSpacingExtra="4dp"
+                        android:padding="16dp"
+                        android:text="📍 Shammah Urban Church, Pretoria East, Gauteng\n📞 +27 12 345 6789\n✉️ support@shammahchurch.org\n⛪ Services: Sundays at 09:00 AM"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/contactSupportBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="#C9A84C"
+                        android:text="CONTACT SUPPORT OFFICE"
+                        android:textColor="#3D0C2F"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:text="USER GUIDE"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#2A1427"
+                        android:lineSpacingExtra="4dp"
+                        android:padding="16dp"
+                        android:text="Home\nChurch details, service times, Prayer Wall and Journal.\n\nEvents\nUpcoming events, live stream, sermon podcast and Sunday RSVP.\n\nGive\nRecord a donation, copy EFT details or pay online.\n\nGroups\nView church groups and request to join one.\n\nProfile\nYour details, settings and sign out."
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:text="FREQUENTLY ASKED QUESTIONS"
+                        android:textColor="#C9A84C"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#2A1427"
+                        android:lineSpacingExtra="4dp"
+                        android:padding="16dp"
+                        android:text="Why is my prayer request not on the wall?\nRequests appear after a pastor approves them.\n\nI forgot my password. What now?\nContact the church office using the details above.\n\nHow do I get a donation receipt?\nTurn on Donation receipts under Notifications."
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/backFromHelpBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="55dp"
+                        android:layout_marginTop="18dp"
+                        android:backgroundTint="#3D0C2F"
+                        android:text="BACK TO SETTINGS"
+                        android:textColor="#C9A84C"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </ScrollView>
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:background="#3D0C2F"
+            android:orientation="horizontal"
+            android:weightSum="5">
+
+            <TextView
+                android:id="@+id/navHome"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Home"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/navEvents"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Events"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/navGive"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Give"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/navGroups"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Groups"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/navProfile"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Profile"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
