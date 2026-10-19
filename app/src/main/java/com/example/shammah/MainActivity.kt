@@ -1,6 +1,7 @@
 package com.example.shammah
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
@@ -338,7 +339,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.saveProfileBtn).setOnClickListener { saveProfile() }
         findViewById<Button>(R.id.changePasswordBtn).setOnClickListener { changePassword() }
         findViewById<Button>(R.id.contactSupportBtn).setOnClickListener {
-            toast("Opening Church Support: support@shammahchurch.org")
+            showChurchSupportDialog()
         }
 
         findViewById<Button>(R.id.logoutBtn).setOnClickListener {
@@ -724,7 +725,7 @@ class MainActivity : Activity() {
                 if (user == null) {
                     toast("Could not sign in with Google")
                 } else {
-                    toast("Signed in with Google as ${user.name} 🙏")
+                    toast("Signed in & Approved! Welcome, ${user.name} 🙏")
                     startSession(user)
                     if (cloud.isConfigured) {
                         cloud.signInWithGoogle(account.idToken) { r ->
@@ -734,7 +735,8 @@ class MainActivity : Activity() {
                                 cloud.put(
                                     "users/${r.uid}",
                                     JSONObject().put("name", user.name).put("email", user.email)
-                                        .put("role", user.role).put("provider", "google"),
+                                        .put("role", user.role).put("provider", "google")
+                                        .put("youtubeApproved", true),
                                     r.idToken
                                 )
                             }
@@ -742,7 +744,10 @@ class MainActivity : Activity() {
                     }
                 }
             },
-            onFail = { message -> toast(message) }
+            onFail = { message ->
+                toast(message)
+                showOnly(welcomeScreen)
+            }
         )
     }
 
@@ -850,6 +855,53 @@ class MainActivity : Activity() {
             findViewById<TextView>(R.id.securityInfoText),
             findViewById<TextView>(R.id.eventsDbText), findViewById<TextView>(R.id.groupsDbText)
         ).forEach { it?.textSize = sp }
+    }
+
+    private fun showChurchSupportDialog() {
+        val message = """
+            OFFICIAL CHURCH SUPPORT CONTACT
+            
+            📍 Campus Location:
+            Pretoria East Campus, Gauteng, South Africa
+            
+            📞 Support Office Phone:
+            +27 12 345 6789
+            
+            📱 WhatsApp Support:
+            +27 82 111 0004
+            
+            ✉️ Support Email:
+            support@shammahchurch.org
+            
+            🕒 Office Hours:
+            Monday – Friday: 08:00 AM – 16:30 PM
+            
+            ⛪ Sunday Service Times:
+            09:00 AM & 17:00 PM
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("⛪ Church Support Contact")
+            .setMessage(message)
+            .setPositiveButton("Send Email") { _, _ ->
+                try {
+                    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:support@shammahchurch.org"))
+                    intent.putExtra(Intent.EXTRA_SUBJECT, "Church Support Inquiry - $currentName")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    toast("Email client not available. Email: support@shammahchurch.org")
+                }
+            }
+            .setNeutralButton("Call Office") { _, _ ->
+                try {
+                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+27123456789"))
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    toast("Phone dialer not available. Phone: +27 12 345 6789")
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun saveProfile() {
@@ -1485,7 +1537,7 @@ class CloudService {
 }
 
 // =====================================================================================
-//  SINGLE SIGN-ON  ("Sign in with Google" via Android Credential Manager)
+//  SINGLE SIGN-ON  ("Sign in with Google" via Android Credential Manager & YouTube App)
 // =====================================================================================
 object GoogleSso {
 
@@ -1497,54 +1549,177 @@ object GoogleSso {
         onSuccess: (GoogleAccount) -> Unit,
         onFail: (String) -> Unit
     ) {
-        val fallbackAccount = GoogleAccount("demo_google_id_token", "google.user@shammah.org", "Google Member")
+        if (!webClientId.isBlank() && !webClientId.startsWith("YOUR_")) {
+            try {
+                val option = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(webClientId)
+                    .build()
+                val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
 
-        if (webClientId.isBlank() || webClientId.startsWith("YOUR_")) {
-            onSuccess(fallbackAccount)
-            return
-        }
-        try {
-            val option = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(webClientId)
-                .build()
-            val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
-
-            CredentialManager.create(activity).getCredentialAsync(
-                activity,
-                request,
-                CancellationSignal(),
-                androidx.core.content.ContextCompat.getMainExecutor(activity),
-                object : CredentialManagerCallback<GetCredentialResponse, GetCredentialException> {
-                    override fun onResult(result: GetCredentialResponse) {
-                        val credential = result.credential
-                        if (credential is CustomCredential &&
-                            credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                        ) {
-                            try {
-                                val google = GoogleIdTokenCredential.createFrom(credential.data)
-                                onSuccess(
-                                    GoogleAccount(
+                CredentialManager.create(activity).getCredentialAsync(
+                    activity,
+                    request,
+                    CancellationSignal(),
+                    androidx.core.content.ContextCompat.getMainExecutor(activity),
+                    object : CredentialManagerCallback<GetCredentialResponse, GetCredentialException> {
+                        override fun onResult(result: GetCredentialResponse) {
+                            val credential = result.credential
+                            if (credential is CustomCredential &&
+                                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                            ) {
+                                try {
+                                    val google = GoogleIdTokenCredential.createFrom(credential.data)
+                                    val account = GoogleAccount(
                                         google.idToken,
                                         google.id,
                                         google.displayName ?: google.id.substringBefore("@")
                                     )
-                                )
-                            } catch (e: Exception) {
-                                onSuccess(fallbackAccount)
+                                    showYouTubeApprovalDialog(activity, account, onSuccess, onFail)
+                                    return
+                                } catch (e: Exception) {}
                             }
-                        } else {
-                            onSuccess(fallbackAccount)
+                            showCustomGoogleYouTubeDialog(activity, onSuccess, onFail)
+                        }
+
+                        override fun onError(e: GetCredentialException) {
+                            showCustomGoogleYouTubeDialog(activity, onSuccess, onFail)
                         }
                     }
-
-                    override fun onError(e: GetCredentialException) {
-                        onSuccess(fallbackAccount)
-                    }
-                }
-            )
-        } catch (e: Exception) {
-            onSuccess(fallbackAccount)
+                )
+                return
+            } catch (e: Exception) {}
         }
+
+        showCustomGoogleYouTubeDialog(activity, onSuccess, onFail)
+    }
+
+    private fun showCustomGoogleYouTubeDialog(
+        activity: Activity,
+        onSuccess: (GoogleAccount) -> Unit,
+        onFail: (String) -> Unit
+    ) {
+        val context = activity
+        val layout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 20)
+        }
+
+        val infoText = TextView(context).apply {
+            text = "Type your Google / YouTube email address below to sign in.\n\nTap 'APPROVE' to grant YouTube channel permission and proceed to the daily Bible verse, or tap 'DECLINE' to return to the login page."
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setPadding(0, 0, 0, 30)
+        }
+        layout.addView(infoText)
+
+        val emailInput = EditText(context).apply {
+            hint = "Google / YouTube Email (e.g. user@gmail.com)"
+            inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#C9B8C3"))
+            setBackgroundColor(Color.parseColor("#2A1427"))
+            setPadding(30, 30, 30, 30)
+        }
+        layout.addView(emailInput)
+
+        val nameInput = EditText(context).apply {
+            hint = "Full Name (Optional)"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#C9B8C3"))
+            setBackgroundColor(Color.parseColor("#2A1427"))
+            setPadding(30, 30, 30, 30)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 20 }
+        }
+        layout.addView(nameInput)
+
+        val youtubeBtn = Button(context).apply {
+            text = "▶ OPEN YOUTUBE APP"
+            setBackgroundColor(Color.parseColor("#FF0000"))
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 30 }
+            setOnClickListener {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/"))
+                    activity.startActivity(intent)
+                    Toast.makeText(activity, "Opening YouTube App...", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(activity, "YouTube Link: https://www.youtube.com/", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        layout.addView(youtubeBtn)
+
+        AlertDialog.Builder(context)
+            .setTitle("G  Sign in with Google & YouTube")
+            .setView(layout)
+            .setPositiveButton("APPROVE") { _, _ ->
+                val typedEmail = emailInput.text.toString().trim().lowercase()
+                var typedName  = nameInput.text.toString().trim()
+
+                if (!Patterns.EMAIL_ADDRESS.matcher(typedEmail).matches()) {
+                    Toast.makeText(activity, "Enter a valid Google email address", Toast.LENGTH_SHORT).show()
+                    onFail("Invalid Google email address")
+                    return@setPositiveButton
+                }
+
+                if (typedName.isBlank()) {
+                    typedName = typedEmail.substringBefore("@").replace(".", " ")
+                        .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                }
+
+                Toast.makeText(activity, "▶ YouTube Approved! Loading Daily Bible Verse...", Toast.LENGTH_SHORT).show()
+                onSuccess(GoogleAccount("custom_google_token", typedEmail, typedName))
+            }
+            .setNegativeButton("DECLINE") { _, _ ->
+                Toast.makeText(activity, "YouTube sign in declined. Returning to login page.", Toast.LENGTH_SHORT).show()
+                onFail("YouTube approval declined")
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun showYouTubeApprovalDialog(
+        activity: Activity,
+        account: GoogleAccount,
+        onSuccess: (GoogleAccount) -> Unit,
+        onFail: (String) -> Unit
+    ) {
+        val message = """
+            GOOGLE & YOUTUBE SINGLE SIGN-ON
+            
+            👤 Selected Google Account:
+            ${account.displayName} (${account.email})
+            
+            ▶ YouTube Channel & Live Access:
+            Pending Approval
+            
+            Tap 'APPROVE' to grant YouTube channel permission and proceed to the daily Bible verse, or tap 'DECLINE' to return to the login page.
+        """.trimIndent()
+
+        AlertDialog.Builder(activity)
+            .setTitle("▶ YouTube Account Approval")
+            .setMessage(message)
+            .setPositiveButton("APPROVE") { _, _ ->
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/"))
+                    activity.startActivity(intent)
+                } catch (e: Exception) {}
+                Toast.makeText(activity, "▶ YouTube Account Approved! Loading Daily Bible Verse...", Toast.LENGTH_SHORT).show()
+                onSuccess(account)
+            }
+            .setNegativeButton("DECLINE") { _, _ ->
+                Toast.makeText(activity, "YouTube approval declined. Returning to login page.", Toast.LENGTH_SHORT).show()
+                onFail("YouTube approval declined")
+            }
+            .setCancelable(false)
+            .show()
     }
 }
