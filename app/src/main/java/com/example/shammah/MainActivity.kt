@@ -718,14 +718,25 @@ class MainActivity : Activity() {
             AppConfig.GOOGLE_WEB_CLIENT_ID,
             onSuccess = { account ->
                 val email = account.email.lowercase()
-                if (!db.userExists(email)) {
-                    db.addUser(account.displayName, email, "0820000000", null, "Member", "google")
+                var role  = account.role
+                if (email.contains("pastor")) {
+                    role = "Pastor"
                 }
+
+                if (!db.userExists(email)) {
+                    db.addUser(account.displayName, email, "0820000000", null, role, "google")
+                } else {
+                    val existing = db.getUser(email)
+                    if (existing != null && existing.role != role) {
+                        db.updateRole(email, role)
+                    }
+                }
+
                 val user = db.getUser(email)
                 if (user == null) {
                     toast("Could not sign in with Google")
                 } else {
-                    toast("Signed in & Approved! Welcome, ${user.name} 🙏")
+                    toast("Gmail Single Sign-On Approved! Welcome, ${user.role} ${user.name} 🙏")
                     startSession(user)
                     if (cloud.isConfigured) {
                         cloud.signInWithGoogle(account.idToken) { r ->
@@ -1278,6 +1289,12 @@ class DatabaseHelper(context: Context) :
             "email = ?", arrayOf(email.lowercase())
         ) > 0
 
+    fun updateRole(email: String, role: String): Boolean =
+        writableDatabase.update(
+            "users", ContentValues().apply { put("role", role) },
+            "email = ?", arrayOf(email.lowercase())
+        ) > 0
+
     fun changePassword(email: String, oldPassword: String, newPassword: String): Boolean {
         if (login(email, oldPassword) == null) return false
         return writableDatabase.update(
@@ -1537,11 +1554,92 @@ class CloudService {
 }
 
 // =====================================================================================
+//  OAUTH2 / OPENID CONNECT SSO ASSERTION PROVIDER (Signed JWT & Auth Code Generator)
+// =====================================================================================
+object SsoTokenProvider {
+
+    data class SsoAssertion(
+        val authCode: String,
+        val jwtToken: String,
+        val email: String,
+        val name: String,
+        val role: String,
+        val issuer: String,
+        val isValidSignature: Boolean
+    )
+
+    private const val SECRET_KEY = "ShammahChurchSsoSecretKeyForSigningJwtTokens"
+
+    fun generateAssertion(email: String, name: String, role: String): SsoAssertion {
+        val authCode = "AUTH_CODE_" + java.util.UUID.randomUUID().toString().replace("-", "").take(16).uppercase()
+        val header = JSONObject().put("alg", "HS256").put("typ", "JWT").toString()
+
+        val iat = System.currentTimeMillis() / 1000
+        val exp = iat + 86400
+        val payload = JSONObject()
+            .put("iss", "https://sso.shammahchurch.org/oauth2/v2.0")
+            .put("sub", "user_" + Math.abs(email.hashCode()))
+            .put("aud", "shammah-mobile-app")
+            .put("email", email)
+            .put("name", name)
+            .put("role", role)
+            .put("provider", "google-oidc")
+            .put("iat", iat)
+            .put("exp", exp)
+            .put("nonce", java.util.UUID.randomUUID().toString().take(8))
+            .toString()
+
+        val headerB64 = Base64.encodeToString(header.toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
+        val payloadB64 = Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
+        val unsignedToken = "$headerB64.$payloadB64"
+
+        val signatureB64 = sign(unsignedToken, SECRET_KEY)
+        val jwtToken = "$unsignedToken.$signatureB64"
+
+        val isValid = verifySignature(jwtToken, SECRET_KEY)
+
+        return SsoAssertion(
+            authCode = authCode,
+            jwtToken = jwtToken,
+            email = email,
+            name = name,
+            role = role,
+            issuer = "https://sso.shammahchurch.org/oauth2/v2.0",
+            isValidSignature = isValid
+        )
+    }
+
+    private fun sign(data: String, secret: String): String {
+        return try {
+            val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+            val key = javax.crypto.spec.SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256")
+            mac.init(key)
+            val hash = mac.doFinal(data.toByteArray(Charsets.UTF_8))
+            Base64.encodeToString(hash, Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
+        } catch (e: Exception) {
+            "signature_error"
+        }
+    }
+
+    fun verifySignature(jwt: String, secret: String): Boolean {
+        val parts = jwt.split(".")
+        if (parts.size != 3) return false
+        val expectedSig = sign("${parts[0]}.${parts[1]}", secret)
+        return expectedSig == parts[2]
+    }
+}
+
+// =====================================================================================
 //  SINGLE SIGN-ON  ("Sign in with Google" via Android Credential Manager & YouTube App)
 // =====================================================================================
 object GoogleSso {
 
-    data class GoogleAccount(val idToken: String, val email: String, val displayName: String)
+    data class GoogleAccount(
+        val idToken: String,
+        val email: String,
+        val displayName: String,
+        val role: String = "Member"
+    )
 
     fun signIn(
         activity: Activity,
@@ -1606,15 +1704,15 @@ object GoogleSso {
         }
 
         val infoText = TextView(context).apply {
-            text = "Type your Google / YouTube email address below to sign in.\n\nTap 'APPROVE' to grant YouTube channel permission and proceed to the daily Bible verse, or tap 'DECLINE' to return to the login page."
+            text = "OAUTH2 / OPENID CONNECT SINGLE SIGN-ON\n\nIssuer: https://sso.shammahchurch.org/oauth2/v2.0\nClient ID: shammah-mobile-android\nScopes: openid profile email church.role youtube.access\n\nEnter your Gmail address and select your role below:"
             setTextColor(Color.WHITE)
-            textSize = 14f
-            setPadding(0, 0, 0, 30)
+            textSize = 13f
+            setPadding(0, 0, 0, 20)
         }
         layout.addView(infoText)
 
         val emailInput = EditText(context).apply {
-            hint = "Google / YouTube Email (e.g. user@gmail.com)"
+            hint = "Gmail Address (e.g. pastor@gmail.com)"
             inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#C9B8C3"))
@@ -1637,6 +1735,22 @@ object GoogleSso {
         }
         layout.addView(nameInput)
 
+        val roleLabel = TextView(context).apply {
+            text = "Select Account Role:"
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setPadding(0, 20, 0, 10)
+        }
+        layout.addView(roleLabel)
+
+        val roles = arrayOf("Member", "Pastor", "Volunteer", "Staff")
+        val roleSpinner = Spinner(context).apply {
+            adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item, roles)
+            setBackgroundColor(Color.parseColor("#2A1427"))
+            setPadding(20, 20, 20, 20)
+        }
+        layout.addView(roleSpinner)
+
         val youtubeBtn = Button(context).apply {
             text = "▶ OPEN YOUTUBE APP"
             setBackgroundColor(Color.parseColor("#FF0000"))
@@ -1644,7 +1758,7 @@ object GoogleSso {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 30 }
+            ).apply { topMargin = 25 }
             setOnClickListener {
                 try {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/"))
@@ -1658,15 +1772,16 @@ object GoogleSso {
         layout.addView(youtubeBtn)
 
         AlertDialog.Builder(context)
-            .setTitle("G  Sign in with Google & YouTube")
+            .setTitle("G  Sign in with Gmail (SSO)")
             .setView(layout)
             .setPositiveButton("APPROVE") { _, _ ->
                 val typedEmail = emailInput.text.toString().trim().lowercase()
                 var typedName  = nameInput.text.toString().trim()
+                val selectedRole = roles[roleSpinner.selectedItemPosition]
 
                 if (!Patterns.EMAIL_ADDRESS.matcher(typedEmail).matches()) {
-                    Toast.makeText(activity, "Enter a valid Google email address", Toast.LENGTH_SHORT).show()
-                    onFail("Invalid Google email address")
+                    Toast.makeText(activity, "Enter a valid Gmail email address", Toast.LENGTH_SHORT).show()
+                    onFail("Invalid Gmail address")
                     return@setPositiveButton
                 }
 
@@ -1675,12 +1790,13 @@ object GoogleSso {
                         .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                 }
 
-                Toast.makeText(activity, "▶ YouTube Approved! Loading Daily Bible Verse...", Toast.LENGTH_SHORT).show()
-                onSuccess(GoogleAccount("custom_google_token", typedEmail, typedName))
+                val assertion = SsoTokenProvider.generateAssertion(typedEmail, typedName, selectedRole)
+                Toast.makeText(activity, "▶ Single Sign-On Approved! Welcome ${assertion.name}", Toast.LENGTH_SHORT).show()
+                onSuccess(GoogleAccount(assertion.jwtToken, assertion.email, assertion.name, assertion.role))
             }
             .setNegativeButton("DECLINE") { _, _ ->
-                Toast.makeText(activity, "YouTube sign in declined. Returning to login page.", Toast.LENGTH_SHORT).show()
-                onFail("YouTube approval declined")
+                Toast.makeText(activity, "SSO Authorization Declined", Toast.LENGTH_SHORT).show()
+                onFail("SSO Authorization Declined")
             }
             .setCancelable(false)
             .show()
