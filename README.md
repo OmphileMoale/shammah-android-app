@@ -16,16 +16,16 @@ Android mobile app for **Shammah Urban Church**, built for XISD6329 Task 2. It w
 - Single sign-on (SSO) with Gmail. Pastor accounts get the Pastor role on sign-in (see *Cloud and SSO configuration* below).
 - User settings that each user can change.
 - Church content: prayer requests, donations, events, church groups and journal entries.
+- Daily scripture: a verse is fetched live from bible-api.com when the phone is online. Built-in verses are shown first and remain the fallback if the request fails or times out.
 - Input validation, so invalid input shows a message instead of crashing the app.
-- Works fully offline using a local SQLite database.
+- Works offline using a local SQLite database (only the live scripture needs an internet connection).
 - Runs on a physical Android phone (not only an emulator).
 
 ## Database
 
-Local SQLite database with 7 tables, each seeded with 10 simulated records:
-`users`, `prayer_requests`, `donations`, `events`, `church_groups`, `journal_entries`, `user_settings`.
+Local SQLite database with 7 tables, each seeded with 10 simulated records: `users`, `prayer_requests`, `donations`, `events`, `church_groups`, `journal_entries`, `user_settings`.
 
-**Demo login:** `pastor@church.com` / `Shammah@123` (simulated data for marking only).
+Demo login: `pastor@church.com` / `Shammah@123` (simulated data for marking only).
 
 ## Tech stack
 
@@ -33,6 +33,7 @@ Local SQLite database with 7 tables, each seeded with 10 simulated records:
 - SQLite (`DatabaseHelper`)
 - Credential Manager / Google ID (`GoogleSso`)
 - Firebase Auth and Realtime Database over HTTPS (`CloudService`, optional)
+- bible-api.com (live daily scripture, optional)
 - Gradle (Kotlin DSL)
 
 ## Project structure
@@ -48,7 +49,7 @@ release/                                                 Built debug APK (conven
 
 ## How to build and run
 
-1. Install **Android Studio** (latest stable) and open this folder.
+1. Install Android Studio (latest stable) and open this folder.
 2. Let Gradle sync finish.
 3. Connect a phone with USB debugging on, or start an emulator.
 4. Press **Run**. The app opens on the login screen.
@@ -63,7 +64,7 @@ Command line:
 ### Install the APK directly
 
 1. Copy the APK from `release/` (or from the pipeline artifact) to your phone.
-2. Allow *Install unknown apps* for your file manager or browser.
+2. Allow **Install unknown apps** for your file manager or browser.
 3. Open the APK and install it.
 
 ## Cloud and SSO configuration
@@ -95,8 +96,8 @@ Unit tests run in the pipeline with `testDebugUnitTest`. The app was also tested
 ## Known limitations
 
 - Real Google SSO and Firebase sync need the three `AppConfig` values to be filled in. Until then SSO is simulated inside the app.
-- The manifest does not yet declare the `INTERNET` permission. Add `<uses-permission android:name="android.permission.INTERNET" />` when cloud sync is enabled.
-- The APK in `release/` is a **debug** build, not a signed release build.
+- The live scripture needs an internet connection (the `INTERNET` permission is declared in the manifest). Offline, the app shows the built-in verses.
+- The APK in `release/` is a debug build, not a signed release build.
 
 ## Related repositories
 
