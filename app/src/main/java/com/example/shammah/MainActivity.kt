@@ -609,6 +609,27 @@ class MainActivity : Activity() {
             "Psalm 46:5\n\nGod is within her, she will not fall."
         )
         scriptureText.text = scriptures.random()
+
+        Executors.newSingleThreadExecutor().execute {
+            try {
+                val references = listOf("jeremiah+29:11", "philippians+4:13", "psalm+23:1", "isaiah+41:10", "romans+8:28", "proverbs+3:5", "john+3:16", "joshua+1:9", "matthew+19:26")
+                val ref = references.random()
+                val conn = URL("https://bible-api.com/$ref").openConnection() as HttpURLConnection
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                if (conn.responseCode in 200..299) {
+                    val text = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(text)
+                    val reference = json.optString("reference")
+                    val passage = json.optString("text").trim()
+                    if (reference.isNotBlank() && passage.isNotBlank()) {
+                        Handler(Looper.getMainLooper()).post {
+                            scriptureText.text = "$reference (Live Bible REST API)\n\n$passage"
+                        }
+                    }
+                }
+            } catch (e: Exception) {}
+        }
     }
 
     private fun openMainApp() {
