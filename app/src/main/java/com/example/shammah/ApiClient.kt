@@ -3,6 +3,7 @@ package com.example.shammah
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.net.HttpURLConnection
@@ -20,8 +21,18 @@ import java.util.concurrent.Executors
 //      ApiClient.post("login.php", JSONObject().put("login", email).put("password", pw)) { r ->
 //          if (r.ok) ... else toast(r.msg)
 //      }
+//
+//  Logging: every request is logged under the tag "ShammahApi" (method, path, attempt and HTTP
+//  status). Passwords, codes and the sign-in token are NEVER written to the log.
+//  View it in Android Studio: Logcat -> filter "Shammah".
+//
+//  References:
+//  Android Developers. Log (android.util). https://developer.android.com/reference/android/util/Log
+//  Android Developers. HttpURLConnection. https://developer.android.com/reference/java/net/HttpURLConnection
 // =====================================================================================
 object ApiClient {
+
+    private const val TAG = "ShammahApi"
 
     class Result(val ok: Boolean, val status: Int, val json: JSONObject, val msg: String)
 
@@ -45,9 +56,12 @@ object ApiClient {
             // GETs are tried up to 3 times (phones often drop the first request after waking up).
             // POSTs are sent once, so a donation or RSVP can never be recorded twice.
             for (attempt in 1..3) {
+                Log.d(TAG, "$method $path (attempt $attempt of 3)")
                 result = try {
                     request(method, url, body)
                 } catch (e: Exception) {
+                    // Network errors (no Wi-Fi, server off, timeout) end up here.
+                    Log.w(TAG, "$method $path attempt $attempt failed: ${e.javaClass.simpleName}")
                     Result(false, 0, JSONObject(),
                         "No connection to the church right now. Please check your internet and try again.")
                 }
@@ -56,10 +70,12 @@ object ApiClient {
             }
             // Saved address didn't answer: try the PC's other addresses and keep the one that works.
             if (result!!.status == 0) {
+                Log.w(TAG, "Saved server address did not answer; trying the fallback addresses")
                 for (alt in AppConfig.FALLBACK_URLS + listOfNotNull(ServerConfig.tunnelUrl())) {
                     if (alt.trimEnd('/') == baseUrl.trimEnd('/')) continue
                     val probe = try { request("GET", alt.trimEnd('/') + "/index.php", null, 4000) } catch (e: Exception) { null }
                     if (probe != null && probe.ok) {
+                        Log.i(TAG, "Switched to fallback server address")
                         baseUrl = alt
                         ServerConfig.remember(alt)
                         result = try {
@@ -70,6 +86,7 @@ object ApiClient {
                 }
             }
             val done = result!!
+            Log.i(TAG, "$method $path finished: HTTP ${done.status}, ok=${done.ok}")
             main.post { callback(done) }
         }
     }
@@ -97,6 +114,7 @@ object ApiClient {
             val json = try {
                 JSONObject(text)
             } catch (e: Exception) {
+                Log.w(TAG, "Reply was not JSON (HTTP $code)")
                 if (text.contains("ERR_NGROK") || text.contains("ngrok", ignoreCase = true)) {
                     // The tunnel address answered but the PC side is off.
                     return Result(false, 0, JSONObject(),
@@ -134,6 +152,7 @@ object ServerConfig {
 
     /** Saves an address that just worked (used by the automatic fallback). */
     fun remember(url: String) {
+        Log.i("ShammahServer", "Saving the server address that just worked")
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.putString("url", url)?.apply()
     }
 
@@ -174,6 +193,7 @@ object SessionStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("token", "").orEmpty()
 
     fun clear(context: Context) {
+        Log.i("ShammahSession", "Signed out: stored session cleared")
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
     }
 }
@@ -211,6 +231,7 @@ object DataCache {
     fun pendingRsvps(): MutableSet<String> = prefs?.getStringSet("pending_rsvp", emptySet())?.toMutableSet() ?: mutableSetOf()
 
     fun savePendingRsvps(titles: Set<String>) {
+        Log.i("ShammahCache", "Offline RSVP queue now holds ${titles.size} event(s)")
         prefs?.edit()?.putStringSet("pending_rsvp", titles)?.apply()
     }
 }
