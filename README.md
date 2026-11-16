@@ -113,8 +113,25 @@ To download the latest APK: **Pipelines -> latest run -> Artifacts**.
 
 ## Testing
 
-- The build and unit tests run in Azure Pipelines on every push to `main`.
+- The build and unit tests run in Azure Pipelines on every push to `main`. The latest run reports 15 tests passed and 0 failed.
+- **15 unit tests** in `app/src/test`: `CardValidatorTest` (10 tests: card types, Luhn checksum, CVV length, cardholder name and expiry) and `PhoneFormatTest` (5 tests: local to international numbers, spaces and brackets, invalid input).
+- Run them locally with `./gradlew testDebugUnitTest`.
 - The app was tested manually on a physical Android phone against the live shared database.
+
+## Logging
+
+The app writes log messages with Android's `Log` class so the flow of the code can be followed in Android Studio (**Logcat**, filter by `Shammah`).
+
+| Tag | What it logs |
+|---|---|
+| `ShammahApi` | Each request (method, endpoint, attempt, HTTP status), retries and fallback server switches |
+| `ShammahAuth` | Two-step code result, Google or Gmail-and-code sign-in path, session restore and sign-out |
+| `ShammahValidation` | Why registration, login or a card payment was rejected |
+| `ShammahGive`, `ShammahPrayer` | Donations submitted and prayer requests approved by a pastor |
+| `ShammahRsvp`, `ShammahCache` | Offline RSVP queue and its sync |
+| `ShammahServer`, `ShammahSession`, `ShammahApp` | Saved server address, stored session and session start |
+
+Passwords, codes, tokens and card details are never written to the log.
 
 ## Release notes
 
@@ -132,6 +149,8 @@ Changes since the prototype. Features marked **(innovative)** are the new ideas 
 - Friendly error messages and input validation on all forms.
 - Phone numbers converted to international format for SMS.
 - Added `BuiltInData.kt` starter content and removed the Firebase-based cloud code.
+- Added logging across sign-in, validation, giving, prayers and the offline queue.
+- Added 15 automated unit tests that run in the Azure pipeline, replacing the default placeholder test.
 
 ## Known limitations
 
