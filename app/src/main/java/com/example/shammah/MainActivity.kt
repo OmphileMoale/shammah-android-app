@@ -16,6 +16,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import android.util.Log
 import android.util.Patterns
 import android.view.View
 import android.view.ViewGroup
@@ -254,6 +255,8 @@ class MainActivity : Activity() {
             val expired = isCardExpired(month, year)
 
             val validation = CardValidator.validateCard(number, name, cvv, expired)
+            // Only the result is logged; the card number, CVV and name are never written to the log.
+            Log.d("ShammahValidation", "Card check: valid=${validation.isValid}, type=${validation.cardType}")
 
             if (!validation.isValid) {
                 toast(validation.errorMessage)
@@ -453,23 +456,28 @@ class MainActivity : Activity() {
         val password = findViewById<EditText>(R.id.createPasswordInput).text.toString().trim()
 
         if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
+            Log.w("ShammahValidation", "Registration rejected: a required field is empty")
             toast("Complete all fields")
             return
         }
         if (name.length < 2 || name.any { it.isDigit() }) {
+            Log.w("ShammahValidation", "Registration rejected: invalid name")
             toast("Enter a valid name")
             return
         }
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            Log.w("ShammahValidation", "Registration rejected: invalid email format")
             toast("Invalid email address")
             return
         }
         val phoneE164 = PhoneFormat.toE164(phone)
         if (phoneE164 == null) {
+            Log.w("ShammahValidation", "Registration rejected: phone number could not be converted to +27 format")
             toast("Enter a valid phone number, e.g. 0821234567 or +27821234567")
             return
         }
         if (password.length < 8 || password.none { it.isLetter() } || password.none { it.isDigit() }) {
+            Log.w("ShammahValidation", "Registration rejected: password does not meet the rules")
             toast("Password must be 8+ characters with a letter and a number")
             return
         }
@@ -497,10 +505,12 @@ class MainActivity : Activity() {
         val password = findViewById<EditText>(R.id.passwordInput).text.toString().trim()
 
         if (!Patterns.EMAIL_ADDRESS.matcher(login).matches() && PhoneFormat.toE164(login) == null) {
+            Log.w("ShammahValidation", "Login rejected: not a valid email or phone number")
             toast("Enter your email address or phone number")
             return
         }
         if (password.isBlank()) {
+            Log.w("ShammahValidation", "Login rejected: password is empty")
             toast("Enter your password")
             return
         }
@@ -585,9 +595,11 @@ class MainActivity : Activity() {
                     .put("device", "Android ${android.os.Build.MODEL}")) { r ->
                     verify.isEnabled = true
                     if (r.ok) {
+                        Log.i("ShammahAuth", "Two-step code accepted by the server")
                         d.dismiss()
                         onSignedIn(r.json.optString("token"), r.json.optJSONObject("user") ?: JSONObject())
                     } else {
+                        Log.w("ShammahAuth", "Two-step code rejected (HTTP ${r.status})")
                         toast(r.msg)
                         codeInput.selectAll()
                     }
@@ -687,6 +699,7 @@ class MainActivity : Activity() {
         ApiClient.token = token
         SessionStore.save(this, token, userJson)
         val user = userFromJson(userJson)
+        Log.i("ShammahAuth", "Signed in successfully (role: ${user.role})")
         if (PhoneFormat.toE164(user.phone) == null) {
             askForPhone("", onPhone = { phone ->
                 ApiClient.post("me.php", JSONObject().put("name", user.name).put("phone", phone)) { r ->
@@ -707,11 +720,13 @@ class MainActivity : Activity() {
             return
         }
         ApiClient.token = saved
+        Log.i("ShammahAuth", "Saved session found; checking it with the server")
         ApiClient.get("me.php") { r ->
             if (r.ok) {
                 startSession(userFromJson(r.json.optJSONObject("user") ?: JSONObject()))
             } else {
                 if (r.status == 401) {
+                    Log.w("ShammahAuth", "Saved session has expired; the member must sign in again")
                     SessionStore.clear(this)
                     ApiClient.token = ""
                 }
@@ -827,6 +842,7 @@ class MainActivity : Activity() {
     }
 
     private fun recordDonation(category: String, amount: Double, method: String, onDone: (Boolean) -> Unit) {
+        Log.i("ShammahGive", "Donation submitted: $category, R$amount via $method")
         ApiClient.post("donations.php",
             JSONObject().put("amount", amount).put("category", category).put("method", method)) { r ->
             toast(r.msg)
@@ -881,6 +897,7 @@ class MainActivity : Activity() {
     }
 
     private fun setPrayerStatus(id: Long, status: String) {
+        Log.i("ShammahPrayer", "Pastor set prayer request $id to $status")
         ApiClient.post("prayer_status.php", JSONObject().put("id", id).put("status", status)) { r ->
             toast(if (r.ok && status == "approved") "Prayer approved and posted" else r.msg)
             refreshPendingPrayers()
@@ -1015,6 +1032,7 @@ class MainActivity : Activity() {
         currentEmail = user.email
         currentPhone = user.phone
         currentRole  = user.role
+        Log.i("ShammahApp", "Session started (role: $currentRole)")
         db.cacheUser(user)          // local copy so journal + settings (SQLite) can link to it
         prefetchLists()             // fill the offline copies in the background
 
@@ -1034,6 +1052,7 @@ class MainActivity : Activity() {
             onSuccess = { account ->
                 // Real Google sign-in: the server checks the Google token.
                 // Typed Gmail address: the server sends a code to that email + phone.
+                Log.i("ShammahAuth", if (account.idToken.isNotBlank()) "Google sign-in: using a Google ID token" else "Google sign-in: no ID token, using the Gmail + code fallback")
                 val (path, body) = if (account.idToken.isNotBlank())
                     "google_login.php" to JSONObject().put("id_token", account.idToken)
                 else
@@ -1049,6 +1068,7 @@ class MainActivity : Activity() {
                 }
             },
             onFail = { message ->
+                Log.w("ShammahAuth", "Google sign-in failed: $message")
                 setAuthBusy(false)
                 toast(message)
             }
@@ -1056,6 +1076,7 @@ class MainActivity : Activity() {
     }
 
     private fun signOut() {
+        Log.i("ShammahAuth", "Member tapped sign out")
         ApiClient.post("logout.php", JSONObject()) { }
         ApiClient.token = ""
         SessionStore.clear(this)
@@ -1108,6 +1129,7 @@ class MainActivity : Activity() {
     private fun sendPendingRsvps() {
         val pending = DataCache.pendingRsvps()
         if (pending.isEmpty()) return
+        Log.i("ShammahRsvp", "Syncing ${pending.size} queued RSVP(s) with the server")
         pending.toList().forEach { title ->
             val ev = loadedEvents.firstOrNull { it.optString("title") == title && it.optInt("id") > 0 }
             if (ev == null || ev.optBoolean("my_rsvp")) {
@@ -1116,6 +1138,7 @@ class MainActivity : Activity() {
             }
             ApiClient.post("rsvp.php", JSONObject().put("event_id", ev.optInt("id")).put("cancel", false)) { r ->
                 if (r.status != 0) {
+                    Log.i("ShammahRsvp", "Queued RSVP for $title reached the server (ok=${r.ok})")
                     val left = DataCache.pendingRsvps(); left.remove(title); DataCache.savePendingRsvps(left)
                     if (r.ok) refreshEvents()
                 }
@@ -1144,6 +1167,7 @@ class MainActivity : Activity() {
                 val queued = DataCache.pendingRsvps()
 
                 if (title in queued) {
+                    Log.i("ShammahRsvp", "Queued RSVP cancelled: $title")
                     queued.remove(title)
                     DataCache.savePendingRsvps(queued)
                     toast("RSVP cancelled for $title")
@@ -1151,6 +1175,7 @@ class MainActivity : Activity() {
                     return@setItems
                 }
 
+                Log.i("ShammahRsvp", "RSVP queued and sent: $title")
                 queued.add(title)
                 DataCache.savePendingRsvps(queued)
 
