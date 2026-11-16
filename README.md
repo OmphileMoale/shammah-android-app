@@ -1,6 +1,10 @@
-# Shammah Urban Church – Android App
+# Shammah Urban Church - Android App
 
-Android mobile app for **Shammah Urban Church**, built for XISD6329 Task 2. It works together with the church website (`shammah-website`) and is developed with Azure DevOps (Boards, Repos, Pipelines).
+Android mobile app for **Shammah Urban Church**, built for XISD6329 (Task 3 - final submission). The app and the church website (`shammah-website`) share **one MySQL database** through a PHP REST API, so a member can register on the website and log in to the app with the same email and password.
+
+## Purpose
+
+The church needed one place where members can stay connected during the week: see upcoming events and RSVP, join church groups, give, send prayer requests, read the daily scripture and keep a private journal. Pastors get a dashboard to manage members, review donations and approve prayer requests.
 
 ## Team
 
@@ -10,48 +14,80 @@ Android mobile app for **Shammah Urban Church**, built for XISD6329 Task 2. It w
 | Oladele Khashane Lucky Abdul-Azeez Rakgolela | Android screens, register/login, SSO, settings, input validation |
 | Lebo Ramoshaba | Azure Pipeline, automated tests, README and documentation, demo video |
 
+## How it works
+
+```
+Android app (Kotlin)  <--HTTPS/HTTP + JSON-->  PHP REST API (website /api)  <-->  MySQL (shammah_db)
+        |                                              |
+  SQLite on phone                               Same accounts as the website
+  (journal, settings,                           6-digit codes by email / SMS
+   cached profile)
+```
+
+- `ApiClient.kt` sends every request to the church server.
+- If the saved server address does not answer, the app tries its fallback addresses and keeps the one that works.
+- The last lists the server sent are cached on the phone, so screens open instantly and still work offline.
+
 ## Features
 
-- Register and log in. Passwords are salted and hashed with PBKDF2 (HMAC-SHA256, 65,536 iterations); no plain-text passwords are stored.
-- Single sign-on (SSO) with Gmail. Pastor accounts get the Pastor role on sign-in (see *Cloud and SSO configuration* below).
-- User settings that each user can change.
-- Church content: prayer requests, donations, events, church groups and journal entries.
-- Input validation, so invalid input shows a message instead of crashing the app.
-- Works fully offline using a local SQLite database.
-- Runs on a physical Android phone (not only an emulator).
+- **Accounts:** register and log in with the same credentials as the website. Passwords are never stored in plain text (the server hashes them).
+- **Two-step sign-in:** a 6-digit code is sent by the server to the member's email (and by SMS where configured).
+- **Sign in with Google (SSO):** uses Android Credential Manager. Until a Google web client ID is added, the app uses the "enter your Gmail + code" sign-in instead (see Known limitations).
+- **Roles:** Member and Pastor. Pastors see a dashboard with *Manage members*, *View donations* and *Approve prayers*.
+- **Events:** list of events with RSVP, including RSVPs made while offline.
+- **Church groups (ministries)** and **prayer requests** (approved by a pastor before they appear).
+- **Giving:** offering, tithe and other categories, with card-payment validation (simulated, no real payment is taken).
+- **Daily scripture** fetched live from bible-api.com.
+- **Private journal** and **settings** (notifications, appearance, security) stored on the phone.
+- **Input validation and friendly errors:** invalid input shows a message instead of crashing, and connection problems explain what to do.
 
-## Database
+### Screens
 
-Local SQLite database with 7 tables, each seeded with 10 simulated records:
-`users`, `prayer_requests`, `donations`, `events`, `church_groups`, `journal_entries`, `user_settings`.
+Splash, Welcome, Create account, Login, Scripture, Home, Events, Give, Card payment, Groups, Prayer, Journal, Profile, Settings (Notifications, Appearance, Security), Help, and the Pastor screens (Manage members, View donations, Approve prayers).
 
-**Demo login:** `pastor@church.com` / `Shammah@123` (simulated data for marking only).
+## Design considerations
+
+- **One database, two front ends.** The app does not keep its own user table. The website API is the single source of truth, so changes show up on both.
+- **Offline first.** `DataCache` stores the last events, groups and prayers. `BuiltInData` supplies starter content on a first launch with no connection.
+- **No duplicate records.** GET requests are retried up to 3 times because phones often drop the first request after waking up. POST requests (RSVP, donation, prayer) are sent **once**, so a donation can never be recorded twice.
+- **Card safety.** The card number, CVV and name are checked on the phone (Luhn checksum, card type, CVV length, expiry) and then cleared. Only the card type and amount are sent to the server.
+- **Clear error messages.** For example, "The church PC is offline. Start Apache and MySQL in XAMPP" instead of a raw network error.
+- **Phone numbers** are converted to international format (for example `0821234567` becomes `+27821234567`) so SMS codes can be delivered.
 
 ## Tech stack
 
-- Kotlin, Android SDK (minSdk 26, targetSdk 36)
-- SQLite (`DatabaseHelper`)
-- Credential Manager / Google ID (`GoogleSso`)
-- Firebase Auth and Realtime Database over HTTPS (`CloudService`, optional)
-- Gradle (Kotlin DSL)
+- Kotlin, Android SDK (minSdk 26, targetSdk 36), Gradle (Kotlin DSL)
+- Plain `HttpURLConnection` + JSON for the REST API (`ApiClient`)
+- SQLite on the phone (journal, settings, cached profile)
+- Credential Manager / Google ID for Google sign-in (`GoogleSso`)
+- PHP + MySQL website and API (separate repo)
 
 ## Project structure
 
 ```
-app/src/main/java/com/example/shammah/MainActivity.kt   App code (UI, database, hashing, cloud, SSO)
-app/src/main/AndroidManifest.xml                         App manifest and permissions
-app/src/test/                                            Unit tests
-app/build.gradle.kts                                     Module build file
-azure-pipelines.yml                                      CI pipeline definition
-release/                                                 Built debug APK (convenience copy)
+app/src/main/java/com/example/shammah/
+    MainActivity.kt     Screens, navigation, validation, card validator, local database
+    ApiClient.kt        REST client, server address handling, offline cache (DataCache)
+    AuthServices.kt     Phone number formatting and Google sign-in
+    BuiltInData.kt      Starter events and ministries for offline use
+app/src/main/res/layout/activity_main.xml   All screens
+app/src/main/AndroidManifest.xml            Permissions (INTERNET, ACCESS_NETWORK_STATE)
+app/src/test/                               Unit tests
+azure-pipelines.yml                         CI pipeline definition
+release/                                    Built APK (convenience copy)
+SETUP_SHARED_DATABASE.md                    How the app and website share the database
+START_SHAMMAH_ONLINE.bat                    Opens an ngrok tunnel so a phone can reach the PC
 ```
 
 ## How to build and run
 
-1. Install **Android Studio** (latest stable) and open this folder.
-2. Let Gradle sync finish.
-3. Connect a phone with USB debugging on, or start an emulator.
-4. Press **Run**. The app opens on the login screen.
+1. Install **Android Studio** (latest stable) and open this folder, then let Gradle sync.
+2. On the PC, start **Apache and MySQL** in XAMPP and make sure the church website is running (see `SETUP_SHARED_DATABASE.md`).
+3. Tell the app where the server is. Edit `AppConfig.API_BASE_URL` in `MainActivity.kt`, or long-press **SIGN IN** in the app and type the address, then press **Save & test**:
+   - Emulator on the same PC: `http://10.0.2.2/shammah-urban-church/api/`
+   - Phone on the same Wi-Fi: `http://<PC IPv4 address>/shammah-urban-church/api/`
+   - Phone on any network: run `START_SHAMMAH_ONLINE.bat` and use the ngrok address it shows
+4. Connect a phone with USB debugging, or start an emulator, and press **Run**.
 
 Command line:
 
@@ -62,41 +98,48 @@ Command line:
 
 ### Install the APK directly
 
-1. Copy the APK from `release/` (or from the pipeline artifact) to your phone.
-2. Allow *Install unknown apps* for your file manager or browser.
-3. Open the APK and install it.
-
-## Cloud and SSO configuration
-
-`AppConfig` in `MainActivity.kt` holds three values:
-
-| Value | Purpose |
-|---|---|
-| `FIREBASE_API_KEY` | Firebase Web API key |
-| `FIREBASE_DB_URL` | Realtime Database URL |
-| `GOOGLE_WEB_CLIENT_ID` | OAuth web client ID for Google sign-in |
-
-They are placeholders (`YOUR_...`) in this repository. **Do not commit real keys.** While they are placeholders, the app runs offline against the local SQLite database, and the SSO flow is simulated: the user enters a Gmail address and the app creates the sign-in code and token itself (`SsoTokenProvider`) without contacting Google. Fill in the values to enable cloud sync and real Google sign-in.
+1. Copy the APK from `release/` (or from the pipeline artifact) to the phone.
+2. Allow *Install unknown apps* for your file manager or browser, then open the APK.
 
 ## Azure DevOps
 
 | Service | Use |
 |---|---|
-| Azure Boards | Epics, features, user stories and sprints (Sprint 1 and Sprint 2) with work assigned to each member |
+| Azure Boards | Epics, features, user stories and sprints with work assigned to each member |
 | Azure Repos | `shammah-android-app` and `shammah-website`, with commits linked to work items |
 | Azure Pipelines | Automatic build and unit tests on every push to `main`; the APK is published as a pipeline artifact |
 
-To download the latest APK: **Pipelines → latest run → Artifacts**.
+To download the latest APK: **Pipelines -> latest run -> Artifacts**.
 
 ## Testing
 
-Unit tests run in the pipeline with `testDebugUnitTest`. The app was also tested manually on a physical Android phone.
+- The build and unit tests run in Azure Pipelines on every push to `main`.
+- The app was tested manually on a physical Android phone against the live shared database.
+
+## Release notes
+
+### Version 1.0 - final submission
+
+Changes since the prototype. Features marked **(innovative)** are the new ideas we added.
+
+- Replaced the offline-only SQLite prototype with the **shared MySQL database** through the website's REST API. Accounts work on both website and app.
+- **(innovative)** Two-step sign-in with a 6-digit code sent by the server by email and SMS.
+- **(innovative)** Offline-first cache: lists open instantly, and **RSVPs made offline are queued and synced** when the server is reachable again.
+- **(innovative)** Automatic reconnect: retries, fallback server addresses and an ngrok tunnel so a phone can reach the PC from any network.
+- **(innovative)** Card validation with Luhn checksum, card type detection, CVV and expiry checks. Card numbers are never sent to the server.
+- Daily scripture fetched live from a public REST API (bible-api.com).
+- Pastor dashboard: manage members, view all donations, approve prayer requests.
+- Friendly error messages and input validation on all forms.
+- Phone numbers converted to international format for SMS.
+- Added `BuiltInData.kt` starter content and removed the Firebase-based cloud code.
 
 ## Known limitations
 
-- Real Google SSO and Firebase sync need the three `AppConfig` values to be filled in. Until then SSO is simulated inside the app.
-- The manifest does not yet declare the `INTERNET` permission. Add `<uses-permission android:name="android.permission.INTERNET" />` when cloud sync is enabled.
-- The APK in `release/` is a **debug** build, not a signed release build.
+- Real Google sign-in needs `AppConfig.GOOGLE_WEB_CLIENT_ID` to be set. While it is the placeholder, the app uses the "Gmail + code" sign-in.
+- Card payments are validated but **simulated**; no payment gateway is connected.
+- Biometric login is **not** implemented.
+- The APK in `release/` is a **debug** build.
+- The server address defaults to a home-network PC address and must be changed for other networks (see How to build and run).
 
 ## Related repositories
 
