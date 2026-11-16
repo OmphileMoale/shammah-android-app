@@ -148,7 +148,7 @@
                 android:layout_height="55dp"
                 android:layout_marginTop="12dp"
                 android:background="#2A1427"
-                android:hint="Phone Number"
+                android:hint="Phone Number (e.g. 0821234567 or +27821234567)"
                 android:inputType="phone"
                 android:padding="15dp"
                 android:textColor="#FFFFFF"
@@ -166,8 +166,10 @@
                 android:textColor="#FFFFFF"
                 android:textColorHint="#C9B8C3" />
 
+            <!-- Roles are given by the church admin on the website, so this stays hidden -->
             <Spinner
                 android:id="@+id/roleSpinner"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="55dp"
                 android:layout_marginTop="12dp"
@@ -232,7 +234,7 @@
                 android:layout_height="55dp"
                 android:layout_marginTop="35dp"
                 android:background="#2A1427"
-                android:hint="Email Address"
+                android:hint="Email or Phone Number"
                 android:inputType="textEmailAddress"
                 android:padding="15dp"
                 android:textColor="#FFFFFF"
@@ -249,6 +251,17 @@
                 android:padding="15dp"
                 android:textColor="#FFFFFF"
                 android:textColorHint="#C9B8C3" />
+
+            <TextView
+                android:id="@+id/forgotPasswordBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginTop="10dp"
+                android:padding="6dp"
+                android:text="Forgot password?"
+                android:textColor="#C9A84C"
+                android:textStyle="bold" />
 
             <Button
                 android:id="@+id/signInBtn"
@@ -1727,7 +1740,7 @@
                         android:background="#2A1427"
                         android:lineSpacingExtra="4dp"
                         android:padding="16dp"
-                        android:text="Why is my prayer request not on the wall?\nRequests appear after a pastor approves them.\n\nI forgot my password. What now?\nContact the church office using the details above.\n\nHow do I get a donation receipt?\nTurn on Donation receipts under Notifications."
+                        android:text="Why is my prayer request not on the wall?\nRequests appear after a pastor approves them.\n\nI forgot my password. What now?\nTap 'Forgot password?' on the login screen and we will email you a reset link.\n\nHow do I get a donation receipt?\nTurn on Donation receipts under Notifications."
                         android:textColor="#FFFFFF"
                         android:textSize="14sp" />
 

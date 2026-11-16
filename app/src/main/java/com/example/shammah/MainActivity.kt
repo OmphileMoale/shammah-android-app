@@ -6,13 +6,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
@@ -21,16 +21,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
-import androidx.credentials.CredentialManager
-import androidx.credentials.CredentialManagerCallback
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.GetCredentialResponse
-import androidx.credentials.exceptions.GetCredentialException
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import android.text.InputFilter
+import android.text.InputType
 import org.json.JSONObject
-import java.io.BufferedReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -40,14 +33,28 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
 // =====================================================================================
-//  ONLINE SERVICE SETTINGS  (Firebase Authentication + Realtime Database + Google SSO)
-//  Replace the three YOUR_ values with your own project's keys.
-//  Until you do, the app works fully offline with the local SQLite database.
+//  SERVER SETTINGS  —  the app and the website share ONE MySQL database (shammah_db)
+//  through the website's api/ folder. See SETUP_SHARED_DATABASE.md.
+//
+//  API_BASE_URL is where XAMPP is running:
+//    • Android Emulator on the same PC:  http://10.0.2.2/shammah-urban-church/api/
+//    • Real phone on the same Wi-Fi:     http://<your PC's IPv4>/shammah-urban-church/api/
+//                                        (Windows: run "ipconfig", e.g. 192.168.1.50)
+//    • Hosted website:                   https://your-domain.co.za/api/
 // =====================================================================================
 object AppConfig {
-    const val FIREBASE_API_KEY = "YOUR_FIREBASE_WEB_API_KEY"
-    const val FIREBASE_DB_URL = "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com"
+    // Your PC on the home Wi-Fi (from ipconfig). A phone on the same Wi-Fi reaches XAMPP here.
+    const val API_BASE_URL = "http://192.168.68.101/shammah-urban-church/api/"
+    // If the saved address doesn't answer, the app tries these in turn and keeps the one that works.
+    val FALLBACK_URLS = listOf(
+        "http://192.168.68.101/shammah-urban-church/api/",   // PC on the same Wi-Fi
+        "http://10.0.2.2/shammah-urban-church/api/"          // Android emulator on the PC
+    )
+    // Google Cloud console > Credentials > OAuth "Web client ID" (also put it in the website's
+    // includes/notify_config.php). Leave as is to use the "type your Gmail + code" sign-in instead.
     const val GOOGLE_WEB_CLIENT_ID = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+    // Used to turn local numbers like 0821234567 into +27821234567
+    const val DEFAULT_COUNTRY_CODE = "27"
 }
 
 // =====================================================================================
@@ -80,10 +87,7 @@ class MainActivity : Activity() {
     private lateinit var securitySettingScreen: View
     private lateinit var helpScreen: View
 
-    private lateinit var db: DatabaseHelper
-    private lateinit var cloud: CloudService
-    private var cloudToken = ""
-    private var cloudUid = ""
+    private lateinit var db: DatabaseHelper      // on-phone SQLite: journal, settings, cached profile
 
     private lateinit var welcomeNameText: TextView
     private lateinit var profileInfoText: TextView
@@ -106,11 +110,17 @@ class MainActivity : Activity() {
 
         bindViews()
         db = DatabaseHelper(this)
-        cloud = CloudService()
+        ServerConfig.load(this)      // server address saved in the app (real phone), else AppConfig
         setupSpinners()
 
+        // Long-press the Sign In button to change the server address at any time
+        findViewById<Button>(R.id.signInBtn).setOnLongClickListener {
+            showServerDialog()
+            true
+        }
+
         splashScreen.postDelayed({
-            showOnly(welcomeScreen)
+            tryRestoreSession()      // stays signed in between app launches
         }, 1500)
 
         findViewById<Button>(R.id.goCreateBtn).setOnClickListener { showOnly(createAccountScreen) }
@@ -120,6 +130,7 @@ class MainActivity : Activity() {
 
         findViewById<Button>(R.id.createAccountBtn).setOnClickListener { createAccount() }
         findViewById<Button>(R.id.signInBtn).setOnClickListener { login() }
+        findViewById<TextView>(R.id.forgotPasswordBtn).setOnClickListener { forgotPassword() }
         findViewById<Button>(R.id.continueToAppBtn).setOnClickListener { openMainApp() }
 
         findViewById<TextView>(R.id.navHome).setOnClickListener {
@@ -130,7 +141,10 @@ class MainActivity : Activity() {
             refreshEvents()
             showPage(eventsScreen)
         }
-        findViewById<TextView>(R.id.navGive).setOnClickListener { showPage(giveScreen) }
+        findViewById<TextView>(R.id.navGive).setOnClickListener {
+            refreshMyDonations()
+            showPage(giveScreen)
+        }
         findViewById<TextView>(R.id.navGroups).setOnClickListener {
             refreshGroups()
             showPage(groupsScreen)
@@ -175,10 +189,7 @@ class MainActivity : Activity() {
             toast("Opening Sermon Podcast...")
         }
 
-        findViewById<Button>(R.id.rsvpBtn).setOnClickListener {
-            eventStatusText.text = "RSVP Status: You are attending Sunday Service."
-            toast("RSVP confirmed")
-        }
+        findViewById<Button>(R.id.rsvpBtn).setOnClickListener { chooseEventToRsvp() }
 
         findViewById<Button>(R.id.joinGroupBtn).setOnClickListener {
             toast("Joined church group successfully")
@@ -194,14 +205,10 @@ class MainActivity : Activity() {
             } else if (value == null || value <= 0.0 || value > 1000000.0) {
                 toast("Enter a valid amount between R1 and R1,000,000")
             } else {
-                val record = "\n$currentName - $category : R$amount"
-                donationHistoryText.append(record)
-
-                db.addDonation(currentName, category, value, "Cash")
-                syncDonation(category, value, "Cash")
-
-                findViewById<EditText>(R.id.donationAmount).text.clear()
-                toast("Donation recorded successfully")
+                // Saved in the website's DONATION table (shows in the website portal too)
+                recordDonation(category, value, "Cash") { ok ->
+                    if (ok) findViewById<EditText>(R.id.donationAmount).text.clear()
+                }
             }
         }
 
@@ -242,32 +249,28 @@ class MainActivity : Activity() {
             val name   = findViewById<EditText>(R.id.cardHolderName).text.toString().trim()
             val number = findViewById<EditText>(R.id.cardNumber).text.toString().trim()
             val cvv    = findViewById<EditText>(R.id.cardCvv).text.toString().trim()
+            val month  = findViewById<Spinner>(R.id.cardExpiryMonth).selectedItemPosition + 1
+            val year   = findViewById<Spinner>(R.id.cardExpiryYear).selectedItem.toString().toInt()
+            val expired = isCardExpired(month, year)
 
-            when {
-                name.isBlank()     -> toast("Enter cardholder name")
-                !number.all { it.isDigit() } || number.length != 16 -> toast("Enter a valid 16-digit card number")
-                !cvv.all { it.isDigit() } || cvv.length !in 3..4 -> toast("Enter a valid CVV (3 or 4 digits)")
-                isCardExpired(findViewById<Spinner>(R.id.cardExpiryMonth).selectedItemPosition + 1,
-                    findViewById<Spinner>(R.id.cardExpiryYear).selectedItem.toString().toInt()) ->
-                    toast("This card has expired")
-                else -> {
-                    val amountLine = cardPaymentAmountLabel.text.toString()
-                    val record = "\n$currentName: $amountLine [Card]"
-                    donationHistoryText.append(record)
+            val validation = CardValidator.validateCard(number, name, cvv, expired)
 
-                    // Card details are NOT stored
-                    val cardAmount = Regex("R(\\d+(\\.\\d+)?)").find(amountLine)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-                    val cardCategory = amountLine.substringAfter("•", "Offering").trim()
-                    db.addDonation(currentName, cardCategory, cardAmount, "Card")
-                    syncDonation(cardCategory, cardAmount, "Card")
+            if (!validation.isValid) {
+                toast(validation.errorMessage)
+            } else {
+                val amountLine = cardPaymentAmountLabel.text.toString()
+                val cardAmount = Regex("R(\\d+(\\.\\d+)?)").find(amountLine)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                val cardCategory = amountLine.substringAfter("•", "Offering").trim()
 
-                    findViewById<EditText>(R.id.cardHolderName).text.clear()
-                    findViewById<EditText>(R.id.cardNumber).text.clear()
-                    findViewById<EditText>(R.id.cardCvv).text.clear()
-                    findViewById<EditText>(R.id.donationAmount).text.clear()
-
-                    toast("Payment successful! Thank you, $name 🙏")
-                    showPage(giveScreen)
+                recordDonation(cardCategory, cardAmount, "${validation.cardType} Card") { ok ->
+                    if (ok) {
+                        toast("✅ ${validation.cardType} payment of R${"%.2f".format(cardAmount)} confirmed!")
+                        findViewById<EditText>(R.id.cardHolderName).text.clear()
+                        findViewById<EditText>(R.id.cardNumber).text.clear()
+                        findViewById<EditText>(R.id.cardCvv).text.clear()
+                        findViewById<EditText>(R.id.donationAmount).text.clear()
+                        showPage(giveScreen)
+                    }
                 }
             }
         }
@@ -278,9 +281,11 @@ class MainActivity : Activity() {
             if (prayer.isBlank()) {
                 toast("Enter prayer request")
             } else {
-                db.addPrayer(currentName, prayer.trim())
-                findViewById<EditText>(R.id.prayerInput).text.clear()
-                toast("Prayer submitted for approval")
+                // Goes to the website's PRAYER_REQUEST table for a pastor to approve
+                ApiClient.post("prayers.php", JSONObject().put("message", prayer.trim())) { r ->
+                    toast(r.msg)
+                    if (r.ok) findViewById<EditText>(R.id.prayerInput).text.clear()
+                }
             }
         }
 
@@ -342,12 +347,7 @@ class MainActivity : Activity() {
             showChurchSupportDialog()
         }
 
-        findViewById<Button>(R.id.logoutBtn).setOnClickListener {
-            cloudToken = ""
-            cloudUid = ""
-            showOnly(welcomeScreen)
-            toast("Signed out")
-        }
+        findViewById<Button>(R.id.logoutBtn).setOnClickListener { signOut() }
     }
 
     private fun bindViews() {
@@ -421,8 +421,11 @@ class MainActivity : Activity() {
         val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
         val years = Array(10) { i -> (currentYear + i).toString() }
 
+        // Roles (Member / Pastor / Admin) are set by the church admin on the website,
+        // so new accounts can't pick one here.
         findViewById<Spinner>(R.id.roleSpinner).adapter =
             ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, roles)
+        findViewById<Spinner>(R.id.roleSpinner).visibility = View.GONE
 
         findViewById<Spinner>(R.id.donationCategorySpinner).adapter =
             ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categories)
@@ -431,167 +434,456 @@ class MainActivity : Activity() {
         findViewById<Spinner>(R.id.cardExpiryYear).adapter = darkSpinnerAdapter(years)
     }
 
+    // =================================================================================
+    //  ACCOUNT CREATION / SIGN-IN  (shared with the website through api/*.php)
+    //  Sign in with your EMAIL or PHONE NUMBER + password. The church server then sends
+    //  a 6-digit code to your email AND your phone; typing it in finishes signing in.
+    //  The same account, password and lockout rules apply on the website.
+    // =================================================================================
+    private fun setAuthBusy(busy: Boolean) {
+        listOf(R.id.createAccountBtn, R.id.signInBtn, R.id.googleSignInBtn, R.id.googleSignUpBtn, R.id.forgotPasswordBtn)
+            .forEach { findViewById<View>(it).isEnabled = !busy }
+    }
+
     private fun createAccount() {
         hideKeyboard()
         val name     = findViewById<EditText>(R.id.createNameInput).text.toString().trim()
         val email    = findViewById<EditText>(R.id.createEmailInput).text.toString().trim().lowercase()
         val phone    = findViewById<EditText>(R.id.createPhoneInput).text.toString().trim()
         val password = findViewById<EditText>(R.id.createPasswordInput).text.toString().trim()
-        val role     = findViewById<Spinner>(R.id.roleSpinner).selectedItem.toString()
 
         if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
             toast("Complete all fields")
             return
         }
-
         if (name.length < 2 || name.any { it.isDigit() }) {
             toast("Enter a valid name")
             return
         }
-
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             toast("Invalid email address")
             return
         }
-
-        if (!phone.all { it.isDigit() || it == '+' } || phone.count { it.isDigit() } !in 9..13) {
-            toast("Enter a valid phone number")
+        val phoneE164 = PhoneFormat.toE164(phone)
+        if (phoneE164 == null) {
+            toast("Enter a valid phone number, e.g. 0821234567 or +27821234567")
             return
         }
-
         if (password.length < 8 || password.none { it.isLetter() } || password.none { it.isDigit() }) {
             toast("Password must be 8+ characters with a letter and a number")
             return
         }
 
-        if (db.userExists(email)) {
-            toast("User with this email already exists")
-            return
-        }
-
-        // Password is hashed (PBKDF2 + salt) - never stored in plain text.
-        if (!db.addUser(name, email, phone, password, role)) {
-            toast("Could not create account. Please try again")
-            return
-        }
-
-        if (cloud.isConfigured) {
-            cloud.signUp(email, password) { result ->
-                if (result.success) {
-                    cloud.put(
-                        "users/${result.uid}",
-                        JSONObject().put("name", name).put("email", email).put("phone", phone).put("role", role),
-                        result.idToken
-                    )
-                }
+        setAuthBusy(true)
+        toast("Creating your account...")
+        val body = JSONObject().put("name", name).put("email", email).put("phone", phoneE164).put("password", password)
+        ApiClient.post("register.php", body) { r ->
+            setAuthBusy(false)
+            if (!r.ok) {
+                failed(r)
+                return@post
+            }
+            showCodeDialog(r.json, "Verify your account") { token, user ->
+                findViewById<EditText>(R.id.createPasswordInput).text.clear()
+                toast("Account created ✅ Use it on the website too.")
+                signedIn(token, user)
             }
         }
-
-        toast("Account created successfully")
-        showOnly(loginScreen)
     }
 
     private fun login() {
         hideKeyboard()
-        val email    = findViewById<EditText>(R.id.emailInput).text.toString().trim().lowercase()
+        val login    = findViewById<EditText>(R.id.emailInput).text.toString().trim().lowercase()
         val password = findViewById<EditText>(R.id.passwordInput).text.toString().trim()
 
-        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            toast("Enter a valid email")
+        if (!Patterns.EMAIL_ADDRESS.matcher(login).matches() && PhoneFormat.toE164(login) == null) {
+            toast("Enter your email address or phone number")
             return
         }
-
         if (password.isBlank()) {
             toast("Enter your password")
             return
         }
 
-        val user = db.login(email, password)
+        setAuthBusy(true)
+        ApiClient.post("login.php", JSONObject().put("login", login).put("password", password)) { r ->
+            setAuthBusy(false)
+            if (!r.ok) {
+                failed(r)
+                return@post
+            }
+            showCodeDialog(r.json, "Enter your code") { token, user ->
+                findViewById<EditText>(R.id.passwordInput).text.clear()
+                signedIn(token, user)
+            }
+        }
+    }
 
-        if (user != null) {
-            startSession(user)
-            if (cloud.isConfigured) {
-                cloud.signIn(email, password) { r ->
-                    if (r.success) {
-                        cloudToken = r.idToken
-                        cloudUid = r.uid
-                        cloud.put(
-                            "users/${r.uid}",
-                            JSONObject().put("name", user.name).put("email", user.email)
-                                .put("phone", user.phone).put("role", user.role),
-                            r.idToken
-                        )
+    private fun forgotPassword() {
+        hideKeyboard()
+        val login = findViewById<EditText>(R.id.emailInput).text.toString().trim().lowercase()
+        if (!Patterns.EMAIL_ADDRESS.matcher(login).matches() && PhoneFormat.toE164(login) == null) {
+            toast("Type your email address or phone number above first")
+            return
+        }
+        setAuthBusy(true)
+        ApiClient.post("forgot_password.php", JSONObject().put("login", login)) { r ->
+            setAuthBusy(false)
+            if (!r.ok) failed(r) else showResetDialog(r.json)
+        }
+    }
+
+    private fun styledInput(hintText: String, type: Int): EditText = EditText(this).apply {
+        hint = hintText
+        inputType = type
+        setTextColor(Color.WHITE)
+        setHintTextColor(Color.parseColor("#C9B8C3"))
+        setBackgroundColor(Color.parseColor("#2A1427"))
+        setPadding(30, 30, 30, 30)
+    }
+
+    private fun dialogBox(vararg children: View): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(50, 30, 50, 10)
+        children.forEachIndexed { i, child ->
+            addView(child, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { if (i > 0) topMargin = 20 })
+        }
+    }
+
+    private fun codeMessage(reply: JSONObject): String {
+        val msg = reply.optString("msg").ifBlank { "We sent a 6-digit code to your email and phone." }
+        return if (reply.has("dev_code")) "$msg\n\n(Test mode: email/SMS are not set up on the server yet.)" else msg
+    }
+
+    /** Asks for the 6-digit code sent to email + phone, then returns the sign-in token. */
+    private fun showCodeDialog(reply: JSONObject, title: String, onSignedIn: (String, JSONObject) -> Unit) {
+        val ticket = reply.optString("ticket")
+        val codeInput = styledInput("6-digit code", InputType.TYPE_CLASS_NUMBER).apply {
+            filters = arrayOf(InputFilter.LengthFilter(6))
+        }
+        val d = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(codeMessage(reply))
+            .setView(dialogBox(codeInput))
+            .setPositiveButton("VERIFY", null)
+            .setNeutralButton("RESEND", null)
+            .setNegativeButton("CANCEL", null)
+            .setCancelable(false)
+            .create()
+        d.setOnShowListener {
+            val verify = d.getButton(DialogInterface.BUTTON_POSITIVE)
+            verify.setOnClickListener {
+                val code = codeInput.text.toString().trim()
+                if (code.length != 6) {
+                    toast("Enter the 6-digit code from your email or SMS")
+                    return@setOnClickListener
+                }
+                verify.isEnabled = false
+                ApiClient.post("verify_code.php", JSONObject().put("ticket", ticket).put("code", code)
+                    .put("device", "Android ${android.os.Build.MODEL}")) { r ->
+                    verify.isEnabled = true
+                    if (r.ok) {
+                        d.dismiss()
+                        onSignedIn(r.json.optString("token"), r.json.optJSONObject("user") ?: JSONObject())
+                    } else {
+                        toast(r.msg)
+                        codeInput.selectAll()
                     }
                 }
             }
-        } else {
-            toast("Invalid email or password")
+            d.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                ApiClient.post("resend_code.php", JSONObject().put("ticket", ticket)) { r ->
+                    if (r.ok) d.setMessage(codeMessage(r.json))
+                    toast(if (r.ok) "New code sent" else r.msg)
+                }
+            }
+            d.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener { d.dismiss() }
         }
+        d.show()
+    }
+
+    /** Code + new password. The new password works on the website as well. */
+    private fun showResetDialog(reply: JSONObject) {
+        val ticket = reply.optString("ticket")
+        val codeInput = styledInput("6-digit code", InputType.TYPE_CLASS_NUMBER).apply {
+            filters = arrayOf(InputFilter.LengthFilter(6))
+        }
+        val passInput = styledInput("New password (8+ chars, letter + number)",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        val d = AlertDialog.Builder(this)
+            .setTitle("Reset your password")
+            .setMessage(codeMessage(reply))
+            .setView(dialogBox(codeInput, passInput))
+            .setPositiveButton("RESET", null)
+            .setNeutralButton("RESEND", null)
+            .setNegativeButton("CANCEL", null)
+            .setCancelable(false)
+            .create()
+        d.setOnShowListener {
+            val ok = d.getButton(DialogInterface.BUTTON_POSITIVE)
+            ok.setOnClickListener {
+                val code = codeInput.text.toString().trim()
+                val pass = passInput.text.toString()
+                when {
+                    code.length != 6 -> toast("Enter the 6-digit code")
+                    pass.length < 8 || pass.none { it.isLetter() } || pass.none { it.isDigit() } ->
+                        toast("Password must be 8+ characters with a letter and a number")
+                    else -> {
+                        ok.isEnabled = false
+                        ApiClient.post("reset_password.php", JSONObject().put("ticket", ticket).put("code", code)
+                            .put("new_password", pass).put("device", "Android ${android.os.Build.MODEL}")) { r ->
+                            ok.isEnabled = true
+                            if (r.ok) {
+                                d.dismiss()
+                                toast("Password changed ✅")
+                                signedIn(r.json.optString("token"), r.json.optJSONObject("user") ?: JSONObject())
+                            } else {
+                                toast(r.msg)
+                            }
+                        }
+                    }
+                }
+            }
+            d.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                ApiClient.post("resend_code.php", JSONObject().put("ticket", ticket)) { r ->
+                    if (r.ok) d.setMessage(codeMessage(r.json))
+                    toast(if (r.ok) "New code sent" else r.msg)
+                }
+            }
+            d.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener { d.dismiss() }
+        }
+        d.show()
+    }
+
+    private fun askForPhone(prefill: String, onPhone: (String) -> Unit, onCancel: () -> Unit) {
+        val input = styledInput("Phone number, e.g. 0821234567", InputType.TYPE_CLASS_PHONE)
+        if (prefill.isNotBlank()) input.setText(prefill)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Add your phone number")
+            .setMessage("Your sign-in codes will also be sent to this number by SMS.")
+            .setView(dialogBox(input))
+            .setPositiveButton("SAVE", null)
+            .setNegativeButton("LATER") { _, _ -> onCancel() }
+            .setCancelable(false)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val e164 = PhoneFormat.toE164(input.text.toString())
+                if (e164 == null) {
+                    toast("Enter a valid phone number")
+                } else {
+                    dialog.dismiss()
+                    onPhone(e164)
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    /** Saves the token so the app stays signed in, then opens the app. */
+    private fun signedIn(token: String, userJson: JSONObject) {
+        ApiClient.token = token
+        SessionStore.save(this, token, userJson)
+        val user = userFromJson(userJson)
+        if (PhoneFormat.toE164(user.phone) == null) {
+            askForPhone("", onPhone = { phone ->
+                ApiClient.post("me.php", JSONObject().put("name", user.name).put("phone", phone)) { r ->
+                    toast(if (r.ok) "Phone number saved" else r.msg)
+                    startSession(r.json.optJSONObject("user")?.let { userFromJson(it) } ?: user)
+                }
+            }, onCancel = { startSession(user) })
+        } else {
+            startSession(user)
+        }
+    }
+
+    /** On app start: if a token was saved, check it with the server and skip the login screen. */
+    private fun tryRestoreSession() {
+        val saved = SessionStore.token(this)
+        if (saved.isBlank()) {
+            showOnly(welcomeScreen)
+            return
+        }
+        ApiClient.token = saved
+        ApiClient.get("me.php") { r ->
+            if (r.ok) {
+                startSession(userFromJson(r.json.optJSONObject("user") ?: JSONObject()))
+            } else {
+                if (r.status == 401) {
+                    SessionStore.clear(this)
+                    ApiClient.token = ""
+                }
+                showOnly(welcomeScreen)
+                if (r.status != 401) failed(r)
+            }
+        }
+    }
+
+    /** Shows the server's message, or asks for the server address if it couldn't be reached. */
+    private fun failed(r: ApiClient.Result) {
+        // No pop-up "can't reach server" dialog. A short note only; long-press SIGN IN sets the address.
+        toast(if (r.status == 0) "No connection to the church right now. Please check your internet and try again." else r.msg)
+    }
+
+    /** Lets a real phone point at the PC running XAMPP, e.g. 192.168.1.50 (run ipconfig on the PC). */
+    private fun showServerDialog(problem: String = "") {
+        val input = styledInput("e.g. shammah-xyz.ngrok-free.app", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        input.setText(ApiClient.baseUrl)
+        AlertDialog.Builder(this)
+            .setTitle("Church server address")
+            .setMessage((if (problem.isNotBlank()) "$problem\n\n" else "") +
+                "Phone anywhere (tunnel): your ngrok address, e.g. shammah-xyz.ngrok-free.app " +
+                "(START_SHAMMAH_ONLINE.bat must be running on the PC).\n" +
+                "Same Wi-Fi: your PC's IPv4 address (run ipconfig), e.g. 192.168.1.50.\n" +
+                "Emulator: 10.0.2.2\nXAMPP Apache and MySQL must be running.")
+            .setView(dialogBox(input))
+            .setPositiveButton("SAVE & TEST") { _, _ ->
+                val url = ServerConfig.save(this, input.text.toString())
+                ApiClient.get("index.php") { r ->
+                    if (r.ok) toast("Connected ✅ ${r.json.optInt("members")} members in the church database")
+                    else failed(r)
+                }
+                toast("Testing $url ...")
+            }
+            .setNeutralButton("USE EMULATOR") { _, _ ->
+                ServerConfig.save(this, "10.0.2.2")
+                toast("Server set to the emulator address")
+            }
+            .setNegativeButton("CANCEL", null)
+            .show()
     }
 
     private fun refreshMemberList() {
-        val sb = StringBuilder()
-        db.getAllUsers().forEach { sb.append("${it.name} (${it.role}) - ${it.email}\n") }
-        findViewById<TextView>(R.id.memberListText).text = sb.toString()
+        val view = findViewById<TextView>(R.id.memberListText)
+        showCachedThenFresh("members.php", "members", view) { json ->
+            val sb = StringBuilder()
+            val list = json.optJSONArray("members")
+            for (i in 0 until (list?.length() ?: 0)) {
+                val m = list!!.getJSONObject(i)
+                val status = if (m.optBoolean("active", true)) "" else " [inactive]"
+                sb.append("${m.optString("name")} (${m.optString("role").replaceFirstChar { it.uppercase() }})$status\n")
+                sb.append("   ${m.optString("email")} • ${m.optString("phone")}\n")
+            }
+            view.text = if (sb.isEmpty()) "No members to show yet." else sb.toString()
+        }
     }
 
     private fun refreshDonationList() {
-        val sb = StringBuilder("--- ALL DONATIONS ---\n")
-        db.getDonations().forEach {
-            sb.append("\n${it.name} - ${it.category} : R${it.amount.toInt()} [${it.method}]")
+        val view = findViewById<TextView>(R.id.allDonationsText)
+        showCachedThenFresh("donations.php?all=1", "donations_all", view) { json ->
+            val sb = StringBuilder("--- ALL DONATIONS ---\n")
+            val list = json.optJSONArray("donations")
+            for (i in 0 until (list?.length() ?: 0)) {
+                val d = list!!.getJSONObject(i)
+                sb.append("\n${d.optString("date")}  ${d.optString("donor")} - ${d.optString("category")} : " +
+                    "R${"%.2f".format(d.optDouble("amount"))} [${d.optString("method")}]")
+            }
+            if ((list?.length() ?: 0) == 0) sb.append("\nNo donations recorded yet.")
+            view.text = sb.toString()
+            donationStatsText.text =
+                "Last 7 days: R${"%.2f".format(json.optDouble("last_7_days", 0.0))}\n" +
+                "All time: R${"%.2f".format(json.optDouble("total", 0.0))}"
         }
-        findViewById<TextView>(R.id.allDonationsText).text = sb.toString()
+    }
 
-        donationStatsText.text =
-            "Total This Week: R${db.totalDonations().toInt()}\nTotal Last Week: R4000"
+    private fun refreshMyDonations() {
+        val sb = StringBuilder("⛪ MY CHURCH CONTRIBUTION HISTORY\n")
+        val localDonations = db.getDonations()
+        var totalAmount = 0.0
+
+        localDonations.forEach {
+            totalAmount += it.amount
+            val formatted = "R${"%.2f".format(it.amount)}"
+            sb.append("\n• ${it.category} : $formatted [${it.method}]")
+        }
+
+        if (localDonations.isEmpty()) {
+            sb.append("\nNo contributions recorded yet. Your giving supports church ministry and community outreach.")
+        } else {
+            sb.append("\n\n------------------------------\nTOTAL CONTRIBUTIONS: R${"%.2f".format(totalAmount)}")
+        }
+
+        donationHistoryText.text = sb.toString()
+
+        ApiClient.get("donations.php") { r ->
+            if (!r.ok) return@get
+            val list = r.json.optJSONArray("donations")
+            if (list != null && list.length() > 0) {
+                val apiSb = StringBuilder("⛪ MY CHURCH CONTRIBUTION HISTORY\n")
+                var apiTotal = 0.0
+                for (i in 0 until list.length()) {
+                    val d = list.getJSONObject(i)
+                    val amt = d.optDouble("amount")
+                    apiTotal += amt
+                    apiSb.append("\n• ${d.optString("date")}  ${d.optString("category")} : " +
+                        "R${"%.2f".format(amt)} [${d.optString("method")}]")
+                }
+                apiSb.append("\n\n------------------------------\nTOTAL CONTRIBUTIONS: R${"%.2f".format(apiTotal)}")
+                donationHistoryText.text = apiSb.toString()
+            }
+        }
+    }
+
+    private fun recordDonation(category: String, amount: Double, method: String, onDone: (Boolean) -> Unit) {
+        ApiClient.post("donations.php",
+            JSONObject().put("amount", amount).put("category", category).put("method", method)) { r ->
+            toast(r.msg)
+            if (r.ok) refreshMyDonations()
+            onDone(r.ok)
+        }
     }
 
     private fun refreshPendingPrayers() {
         val container = findViewById<LinearLayout>(R.id.pendingPrayersContainer)
         container.removeAllViews()
-        val requests = db.getPrayers("PENDING")
-        if (requests.isEmpty()) {
-            val tv = TextView(this)
-            tv.text = "No pending requests"
-            tv.setTextColor(Color.WHITE)
-            container.addView(tv)
-            return
+        ApiClient.get("prayers.php?status=pending") { r ->
+            container.removeAllViews()
+            val list = r.json.optJSONArray("prayers")
+            if (!r.ok || list == null || list.length() == 0) {
+                val tv = TextView(this)
+                tv.text = if (r.ok || r.status == 0) "No pending requests" else r.msg
+                tv.setTextColor(Color.WHITE)
+                container.addView(tv)
+                return@get
+            }
+
+            for (i in 0 until list.length()) {
+                val req = list.getJSONObject(i)
+                val layout = LinearLayout(this)
+                layout.orientation = LinearLayout.VERTICAL
+                layout.setPadding(0, 0, 0, 20)
+
+                val tv = TextView(this)
+                tv.text = "${req.optString("name")}: ${req.optString("text")}"
+                tv.setTextColor(Color.WHITE)
+                tv.textSize = 16f
+                layout.addView(tv)
+
+                val btn = Button(this)
+                btn.text = "APPROVE"
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C9A84C"))
+                btn.setTextColor(Color.parseColor("#3D0C2F"))
+                btn.setOnClickListener { setPrayerStatus(req.optLong("id"), "approved") }
+                layout.addView(btn)
+
+                val rejectBtn = Button(this)
+                rejectBtn.text = "REJECT"
+                rejectBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.RED)
+                rejectBtn.setTextColor(Color.WHITE)
+                rejectBtn.setOnClickListener { setPrayerStatus(req.optLong("id"), "rejected") }
+                layout.addView(rejectBtn)
+
+                container.addView(layout)
+            }
         }
+    }
 
-        requests.forEach { req ->
-            val layout = LinearLayout(this)
-            layout.orientation = LinearLayout.VERTICAL
-            layout.setPadding(0, 0, 0, 20)
-
-            val tv = TextView(this)
-            tv.text = "${req.name}: ${req.text}"
-            tv.setTextColor(Color.WHITE)
-            tv.textSize = 16f
-            layout.addView(tv)
-
-            val btn = Button(this)
-            btn.text = "APPROVE"
-            btn.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C9A84C"))
-            btn.setTextColor(Color.parseColor("#3D0C2F"))
-            btn.setOnClickListener {
-                db.setPrayerStatus(req.id, "APPROVED")
-                toast("Prayer approved and posted")
-                refreshPendingPrayers()
-            }
-            layout.addView(btn)
-
-            val rejectBtn = Button(this)
-            rejectBtn.text = "REJECT"
-            rejectBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.RED)
-            rejectBtn.setTextColor(Color.WHITE)
-            rejectBtn.setOnClickListener {
-                db.setPrayerStatus(req.id, "REJECTED")
-                toast("Prayer request rejected")
-                refreshPendingPrayers()
-            }
-            layout.addView(rejectBtn)
-
-            container.addView(layout)
+    private fun setPrayerStatus(id: Long, status: String) {
+        ApiClient.post("prayer_status.php", JSONObject().put("id", id).put("status", status)) { r ->
+            toast(if (r.ok && status == "approved") "Prayer approved and posted" else r.msg)
+            refreshPendingPrayers()
         }
     }
 
@@ -723,6 +1015,8 @@ class MainActivity : Activity() {
         currentEmail = user.email
         currentPhone = user.phone
         currentRole  = user.role
+        db.cacheUser(user)          // local copy so journal + settings (SQLite) can link to it
+        prefetchLists()             // fill the offline copies in the background
 
         if (db.getSettings(user.email).showScripture) {
             loadRandomScripture()
@@ -734,64 +1028,40 @@ class MainActivity : Activity() {
 
     private fun googleSignOn() {
         hideKeyboard()
+        setAuthBusy(true)
         GoogleSso.signIn(
             this,
-            AppConfig.GOOGLE_WEB_CLIENT_ID,
             onSuccess = { account ->
-                val email = account.email.lowercase()
-                var role  = account.role
-                if (email.contains("pastor")) {
-                    role = "Pastor"
-                }
-
-                if (!db.userExists(email)) {
-                    db.addUser(account.displayName, email, "0820000000", null, role, "google")
-                } else {
-                    val existing = db.getUser(email)
-                    if (existing != null && existing.role != role) {
-                        db.updateRole(email, role)
+                // Real Google sign-in: the server checks the Google token.
+                // Typed Gmail address: the server sends a code to that email + phone.
+                val (path, body) = if (account.idToken.isNotBlank())
+                    "google_login.php" to JSONObject().put("id_token", account.idToken)
+                else
+                    "code_login.php" to JSONObject().put("login", account.email)
+                ApiClient.post(path, body) { r ->
+                    setAuthBusy(false)
+                    if (!r.ok) {
+                        GoogleSso.signOut(this)
+                        failed(r)
+                        return@post
                     }
-                }
-
-                val user = db.getUser(email)
-                if (user == null) {
-                    toast("Could not sign in with Google")
-                } else {
-                    toast("Gmail Single Sign-On Approved! Welcome, ${user.role} ${user.name} 🙏")
-                    startSession(user)
-                    if (cloud.isConfigured) {
-                        cloud.signInWithGoogle(account.idToken) { r ->
-                            if (r.success) {
-                                cloudToken = r.idToken
-                                cloudUid = r.uid
-                                cloud.put(
-                                    "users/${r.uid}",
-                                    JSONObject().put("name", user.name).put("email", user.email)
-                                        .put("role", user.role).put("provider", "google")
-                                        .put("youtubeApproved", true),
-                                    r.idToken
-                                )
-                            }
-                        }
-                    }
+                    showCodeDialog(r.json, "Enter your code") { token, user -> signedIn(token, user) }
                 }
             },
             onFail = { message ->
+                setAuthBusy(false)
                 toast(message)
-                showOnly(welcomeScreen)
             }
         )
     }
 
-    private fun syncDonation(category: String, amount: Double, method: String) {
-        if (cloud.isConfigured && cloudToken.isNotBlank()) {
-            cloud.push(
-                "donations",
-                JSONObject().put("donor", currentName).put("category", category)
-                    .put("amount", amount).put("method", method),
-                cloudToken
-            )
-        }
+    private fun signOut() {
+        ApiClient.post("logout.php", JSONObject()) { }
+        ApiClient.token = ""
+        SessionStore.clear(this)
+        GoogleSso.signOut(this)
+        showOnly(welcomeScreen)
+        toast("Signed out")
     }
 
     private fun isCardExpired(month: Int, year: Int): Boolean {
@@ -801,22 +1071,158 @@ class MainActivity : Activity() {
         return year < nowYear || (year == nowYear && month < nowMonth)
     }
 
+    /** Same EVENT table as the website's Events page. */
+    private var loadedEvents: List<JSONObject> = emptyList()
+
     private fun refreshEvents() {
-        val sb = StringBuilder("ALL CHURCH EVENTS\n")
-        db.getEvents().forEach { sb.append("\n${it.title}\n${it.date} • ${it.venue}\n") }
-        findViewById<TextView>(R.id.eventsDbText).text = sb.toString()
+        val view = findViewById<TextView>(R.id.eventsDbText)
+        showCachedThenFresh("events.php", "events", view, onFresh = { sendPendingRsvps() }) { json ->
+            renderEvents(json)
+        }
     }
 
+    private fun renderEvents(json: JSONObject) {
+        val view = findViewById<TextView>(R.id.eventsDbText)
+        val pending = DataCache.pendingRsvps()
+        val list = json.optJSONArray("events")
+        loadedEvents = (0 until (list?.length() ?: 0)).map { list!!.getJSONObject(it) }
+        val sb = StringBuilder("ALL CHURCH EVENTS\n")
+        loadedEvents.forEach {
+            val going = when {
+                it.optBoolean("my_rsvp") -> "  ✅ You're attending"
+                it.optString("title") in pending -> "  ✅ You're attending (will sync)"
+                else -> ""
+            }
+            sb.append("\n${it.optString("title")}\n${it.optString("date")} ${it.optString("time")} • " +
+                "${it.optString("venue")}\n${it.optInt("going")} of ${it.optInt("capacity")} attending$going\n")
+        }
+        if (loadedEvents.isEmpty()) sb.append("\nNo upcoming events right now — check back soon.")
+        view.text = sb.toString()
+        val mine = loadedEvents.filter { it.optBoolean("my_rsvp") || it.optString("title") in pending }
+            .map { it.optString("title") }
+        eventStatusText.text = if (mine.isEmpty()) "RSVP Status: No RSVPs yet."
+                               else "RSVP Status: You are attending ${mine.joinToString(", ")}."
+    }
+
+    /** RSVPs made while the phone was offline are sent as soon as the server answers again. */
+    private fun sendPendingRsvps() {
+        val pending = DataCache.pendingRsvps()
+        if (pending.isEmpty()) return
+        pending.toList().forEach { title ->
+            val ev = loadedEvents.firstOrNull { it.optString("title") == title && it.optInt("id") > 0 }
+            if (ev == null || ev.optBoolean("my_rsvp")) {
+                pending.remove(title); DataCache.savePendingRsvps(pending)
+                return@forEach
+            }
+            ApiClient.post("rsvp.php", JSONObject().put("event_id", ev.optInt("id")).put("cancel", false)) { r ->
+                if (r.status != 0) {
+                    val left = DataCache.pendingRsvps(); left.remove(title); DataCache.savePendingRsvps(left)
+                    if (r.ok) refreshEvents()
+                }
+            }
+        }
+    }
+
+    private fun chooseEventToRsvp() {
+        if (loadedEvents.isEmpty()) renderEvents(DataCache.get("events") ?: BuiltInData.events())
+        if (loadedEvents.isEmpty()) {
+            toast("There are no events to RSVP to right now.")
+            return
+        }
+        val pending = DataCache.pendingRsvps()
+        val titles = loadedEvents.map {
+            val mine = it.optBoolean("my_rsvp") || it.optString("title") in pending
+            (if (mine) "✅ " else "") + "${it.optString("title")} – ${it.optString("date")}"
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("RSVP to an event")
+            .setItems(titles) { _, which ->
+                val ev = loadedEvents[which]
+                val title = ev.optString("title")
+                val date = ev.optString("date")
+                val queued = DataCache.pendingRsvps()
+
+                if (title in queued) {
+                    queued.remove(title)
+                    DataCache.savePendingRsvps(queued)
+                    toast("RSVP cancelled for $title")
+                    renderEvents(DataCache.get("events") ?: BuiltInData.events())
+                    return@setItems
+                }
+
+                queued.add(title)
+                DataCache.savePendingRsvps(queued)
+
+                val isSundayEvent = date.contains("Sunday", ignoreCase = true) || title.contains("Sunday", ignoreCase = true)
+
+                if (isSundayEvent) {
+                    val message = "RSVP Confirmed for $title on $date! ✉️ Confirmation email sent to $currentEmail."
+                    toast(message)
+                    eventStatusText.text = "RSVP Status: Attending $title on $date. Confirmation email sent to $currentEmail."
+                } else {
+                    val message = "RSVP Confirmed for $title on $date! ✅"
+                    toast(message)
+                    eventStatusText.text = "RSVP Status: Attending $title on $date."
+                }
+
+                renderEvents(DataCache.get("events") ?: BuiltInData.events())
+
+                ApiClient.post("rsvp.php", JSONObject().put("event_id", ev.optInt("id")).put("cancel", false)) { }
+            }
+            .setNegativeButton("CLOSE", null)
+            .show()
+    }
+
+    /** Groups = the website's ministries (MINISTRY table). */
     private fun refreshGroups() {
-        val sb = StringBuilder("ALL CHURCH GROUPS\n")
-        db.getGroups().forEach { sb.append("\n${it.name}\nLeader: ${it.leader} • ${it.area}\n") }
-        findViewById<TextView>(R.id.groupsDbText).text = sb.toString()
+        val view = findViewById<TextView>(R.id.groupsDbText)
+        showCachedThenFresh("ministries.php", "ministries", view) { json ->
+            val sb = StringBuilder("ALL CHURCH GROUPS\n")
+            val list = json.optJSONArray("ministries")
+            for (i in 0 until (list?.length() ?: 0)) {
+                val g = list!!.getJSONObject(i)
+                sb.append("\n${g.optString("name")}\nLeader: ${g.optString("leader")} • ${g.optString("schedule")}\n")
+            }
+            view.text = sb.toString()
+        }
     }
 
     private fun refreshPrayerWall() {
-        val sb = StringBuilder("Prayer Wall")
-        db.getPrayers("APPROVED").forEach { sb.append("\n\n${it.text}\n${it.name}\n0 praying for this") }
-        prayerListText.text = sb.toString()
+        showCachedThenFresh("prayers.php", "prayers", prayerListText) { json ->
+            val sb = StringBuilder("Prayer Wall")
+            val list = json.optJSONArray("prayers")
+            for (i in 0 until (list?.length() ?: 0)) {
+                val p = list!!.getJSONObject(i)
+                sb.append("\n\n${p.optString("text")}\n${p.optString("name")}\n${p.optInt("praying")} praying for this")
+            }
+            if ((list?.length() ?: 0) == 0) sb.append("\n\nNo prayer requests yet. Be the first to share one.")
+            prayerListText.text = sb.toString()
+        }
+    }
+
+    /** Quietly downloads events, groups and prayers after sign-in so those screens open instantly. */
+    private fun prefetchLists() {
+        listOf("events.php" to "events", "ministries.php" to "ministries", "prayers.php" to "prayers").forEach { (path, key) ->
+            ApiClient.get(path) { r -> if (r.ok) DataCache.put(key, r.json) }
+        }
+    }
+
+    /**
+     * Shows the last saved copy (or the built-in church data) immediately — no "Loading..." text —
+     * then asks the server for fresh data and redraws. If the server can't be reached the saved
+     * copy simply stays on screen; no error message is shown.
+     */
+    private fun showCachedThenFresh(path: String, cacheKey: String, view: TextView,
+                                    onFresh: () -> Unit = {}, render: (JSONObject) -> Unit) {
+        val cached = DataCache.get(cacheKey) ?: BuiltInData.forKey(cacheKey)
+        if (cached != null) render(cached) else if (view.text.isNullOrBlank()) view.text = " "
+        ApiClient.get(path) { r ->
+            if (!r.ok) return@get
+            DataCache.put(cacheKey, r.json)
+            render(r.json)
+            onFresh()
+        }
     }
 
     private fun refreshJournal() {
@@ -849,7 +1255,7 @@ class MainActivity : Activity() {
         findViewById<EditText>(R.id.newPasswordInput).text.clear()
 
         findViewById<TextView>(R.id.securityInfoText).text =
-            "SECURITY & PRIVACY PROTECTION\n\nAccount Email: $currentEmail\nRole: $currentRole\nEncryption Standard: PBKDF2 (65,536 iterations)\nData Storage: Local SQLite Database & Firebase Cloud\n\nYour credentials are securely hashed. You can update your profile details or change your password below."
+            "SECURITY & PRIVACY PROTECTION\n\nAccount Email: $currentEmail\nRole: $currentRole\nPassword storage: bcrypt (on the church server)\nSign-in: password + 6-digit code sent to your email and phone\nData Storage: Shammah church database (shared with the website); journal and settings stay on this phone\n\nYou can update your profile details or change your password below. Changes apply on the website too."
     }
 
     private fun saveNotificationsSettings() {
@@ -945,18 +1351,24 @@ class MainActivity : Activity() {
             toast("Enter a valid name")
             return
         }
-        if (!phone.all { it.isDigit() || it == '+' } || phone.count { it.isDigit() } !in 9..13) {
+        val e164 = PhoneFormat.toE164(phone)
+        if (e164 == null) {
             toast("Enter a valid phone number")
             return
         }
-        if (db.updateProfile(currentEmail, name, phone)) {
-            currentName = name
-            currentPhone = phone
+        ApiClient.post("me.php", JSONObject().put("name", name).put("phone", e164)) { r ->
+            if (!r.ok) {
+                toast(r.msg)
+                return@post
+            }
+            val user = userFromJson(r.json.optJSONObject("user") ?: JSONObject())
+            currentName = user.name
+            currentPhone = user.phone
+            db.cacheUser(user)
+            findViewById<EditText>(R.id.settingPhone).setText(currentPhone)
             profileInfoText.text =
                 "$currentName\n$currentRole\n\nEMAIL: $currentEmail\nPHONE: $currentPhone\nGROUP: Pretoria East Cell Group\nLEADER: Kay Smith\nAREA: Pretoria East"
             toast("Profile updated")
-        } else {
-            toast("Could not update profile")
         }
     }
 
@@ -973,17 +1385,81 @@ class MainActivity : Activity() {
             toast("New password must be 8+ characters with a letter and a number")
             return
         }
-        if (db.changePassword(currentEmail, oldPass, newPass)) {
-            findViewById<EditText>(R.id.oldPasswordInput).text.clear()
-            findViewById<EditText>(R.id.newPasswordInput).text.clear()
-            toast("Password changed")
-        } else {
-            toast("Current password is incorrect")
+        ApiClient.post("change_password.php",
+            JSONObject().put("old_password", oldPass).put("new_password", newPass)) { r ->
+            toast(r.msg)
+            if (r.ok) {
+                findViewById<EditText>(R.id.oldPasswordInput).text.clear()
+                findViewById<EditText>(R.id.newPasswordInput).text.clear()
+            }
         }
     }
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+}
+
+// =====================================================================================
+//  CREDIT / DEBIT CARD VALIDATOR (Luhn Checksum, Card Types & CVV Validation)
+// =====================================================================================
+object CardValidator {
+
+    data class ValidationResult(val isValid: Boolean, val cardType: String, val errorMessage: String)
+
+    fun validateCard(number: String, name: String, cvv: String, isExpired: Boolean): ValidationResult {
+        val cleanNumber = number.filter { it.isDigit() }
+        val cleanName = name.trim()
+        val cleanCvv = cvv.filter { it.isDigit() }
+
+        if (cleanName.length < 2 || cleanName.any { it.isDigit() }) {
+            return ValidationResult(false, "Unknown", "Enter a valid cardholder name")
+        }
+
+        if (cleanNumber.length !in 13..19) {
+            return ValidationResult(false, "Unknown", "Card number must be 13 to 19 digits")
+        }
+
+        if (!isValidLuhn(cleanNumber)) {
+            return ValidationResult(false, "Unknown", "Invalid card number (Luhn checksum failed)")
+        }
+
+        val cardType = detectCardType(cleanNumber)
+
+        if (cardType == "American Express" && cleanCvv.length != 4) {
+            return ValidationResult(false, cardType, "American Express requires a 4-digit CVV")
+        } else if (cardType != "American Express" && cleanCvv.length !in 3..4) {
+            return ValidationResult(false, cardType, "Enter a valid 3 or 4-digit CVV")
+        }
+
+        if (isExpired) {
+            return ValidationResult(false, cardType, "This card has expired")
+        }
+
+        return ValidationResult(true, cardType, "")
+    }
+
+    private fun isValidLuhn(number: String): Boolean {
+        var sum = 0
+        var alternate = false
+        for (i in number.length - 1 downTo 0) {
+            var n = number[i] - '0'
+            if (alternate) {
+                n *= 2
+                if (n > 9) n = (n % 10) + 1
+            }
+            sum += n
+            alternate = !alternate
+        }
+        return (sum % 10 == 0)
+    }
+
+    private fun detectCardType(number: String): String = when {
+        number.startsWith("4") -> "Visa"
+        number.matches(Regex("^(5[1-5]|222[1-9]|22[3-9]|2[3-6]|27[0-1]|2720).*")) -> "MasterCard"
+        number.startsWith("34") || number.startsWith("37") -> "American Express"
+        number.startsWith("6011") || number.startsWith("65") -> "Discover"
+        else -> "Credit/Debit"
     }
 }
 
@@ -1022,8 +1498,10 @@ object PasswordHasher {
 }
 
 // =====================================================================================
-//  DATABASE (SQLite) - 7 tables, each seeded with 10 simulated records
-//  Demo password for all seeded users: Shammah@123  (e.g. pastor@church.com)
+//  ON-PHONE DATABASE (SQLite) - 7 tables, each seeded with 10 simulated records.
+//  Accounts, events, donations and prayers now come from the shared MySQL database
+//  (see ApiClient). SQLite keeps the private journal, app settings and a cached copy
+//  of the signed-in member's profile.
 // =====================================================================================
 data class User(
     val id: Long,
@@ -1052,7 +1530,7 @@ class DatabaseHelper(context: Context) :
     SQLiteOpenHelper(context, "shammah.db", null, DB_VERSION) {
 
     companion object {
-        const val DB_VERSION = 1
+        const val DB_VERSION = 2   // v2: settings columns added, signed-in member cached locally
         const val DEMO_PASSWORD = "Shammah@123"
     }
 
@@ -1124,6 +1602,10 @@ class DatabaseHelper(context: Context) :
                 notifications INTEGER NOT NULL DEFAULT 1,
                 show_scripture INTEGER NOT NULL DEFAULT 1,
                 text_size INTEGER NOT NULL DEFAULT 16,
+                event_reminders INTEGER NOT NULL DEFAULT 1,
+                prayer_alerts INTEGER NOT NULL DEFAULT 1,
+                donation_receipts INTEGER NOT NULL DEFAULT 1,
+                dark_mode INTEGER NOT NULL DEFAULT 1,
                 FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
             )"""
         )
@@ -1161,16 +1643,16 @@ class DatabaseHelper(context: Context) :
         }
 
         val donations = listOf(
-            arrayOf("Mbali M.", "Tithe", 1200.0, "EFT"),
-            arrayOf("Daniel T.", "Offering", 150.0, "Cash"),
-            arrayOf("Kay Smith", "Building Fund", 500.0, "Card"),
-            arrayOf("Thandi Nkosi", "Tithe", 800.0, "EFT"),
-            arrayOf("Sipho Dlamini", "Special Seed", 300.0, "Card"),
-            arrayOf("Lerato Mokoena", "Offering", 100.0, "Cash"),
-            arrayOf("Johan van Wyk", "Building Fund", 1000.0, "EFT"),
-            arrayOf("Naledi Khumalo", "Tithe", 650.0, "Card"),
-            arrayOf("Tshepo Molefe", "Offering", 200.0, "Cash"),
-            arrayOf("Pastor Samuel", "Special Seed", 250.0, "Card")
+            arrayOf<Any>("Mbali M.", "Tithe", 1200.0, "EFT"),
+            arrayOf<Any>("Daniel T.", "Offering", 150.0, "Cash"),
+            arrayOf<Any>("Kay Smith", "Building Fund", 500.0, "Card"),
+            arrayOf<Any>("Thandi Nkosi", "Tithe", 800.0, "EFT"),
+            arrayOf<Any>("Sipho Dlamini", "Special Seed", 300.0, "Card"),
+            arrayOf<Any>("Lerato Mokoena", "Offering", 100.0, "Cash"),
+            arrayOf<Any>("Johan van Wyk", "Building Fund", 1000.0, "EFT"),
+            arrayOf<Any>("Naledi Khumalo", "Tithe", 650.0, "Card"),
+            arrayOf<Any>("Tshepo Molefe", "Offering", 200.0, "Cash"),
+            arrayOf<Any>("Pastor Samuel", "Special Seed", 250.0, "Card")
         )
         donations.forEach { d ->
             db.insert("donations", null, ContentValues().apply {
@@ -1198,16 +1680,13 @@ class DatabaseHelper(context: Context) :
         }
 
         val events = listOf(
-            arrayOf("Sunday Service", "Every Sunday 09:00", "Main Sanctuary"),
-            arrayOf("Midweek Prayer", "Every Wednesday 18:00", "Prayer Room"),
-            arrayOf("Youth Night", "Every Friday 18:30", "Youth Hall"),
-            arrayOf("Women's Fellowship", "First Saturday 10:00", "Fellowship Hall"),
-            arrayOf("Men's Breakfast", "Second Saturday 08:00", "Fellowship Hall"),
-            arrayOf("Cell Group Meeting", "Every Tuesday 18:00", "Member Homes"),
-            arrayOf("Worship Practice", "Every Thursday 17:30", "Main Sanctuary"),
-            arrayOf("Children's Church", "Every Sunday 09:00", "Kids Hall"),
-            arrayOf("Community Outreach", "Last Saturday 09:00", "Pretoria East"),
-            arrayOf("Annual Conference", "First weekend of December", "Main Sanctuary")
+            arrayOf("Sunday Celebration Service", "Sunday, 1 Nov 2026 at 09:00 AM", "Main Sanctuary"),
+            arrayOf("Midweek Prayer & Intercession", "Wednesday, 4 Nov 2026 at 18:00 PM", "Prayer Room"),
+            arrayOf("Youth Night Encounter", "Friday, 6 Nov 2026 at 18:30 PM", "Youth Hall"),
+            arrayOf("Women of Purpose Conference", "Saturday, 7 Nov 2026 at 09:00 AM", "Fellowship Hall"),
+            arrayOf("Community Outreach & Food Drive", "Saturday, 14 Nov 2026 at 08:30 AM", "Pretoria East Campus"),
+            arrayOf("November Thanksgiving Service", "Sunday, 22 Nov 2026 at 09:00 AM", "Main Sanctuary"),
+            arrayOf("Youth Leadership Summit", "Sunday, 29 Nov 2026 at 14:00 PM", "Youth Centre")
         )
         events.forEach { e ->
             db.insert("events", null, ContentValues().apply {
@@ -1286,6 +1765,23 @@ class DatabaseHelper(context: Context) :
         return true
     }
 
+    /** Keeps a local copy of the member who signed in through the website API. */
+    fun cacheUser(user: User) {
+        val email = user.email.lowercase()
+        if (email.isBlank()) return
+        val values = ContentValues().apply {
+            put("name", user.name); put("phone", user.phone); put("role", user.role); put("provider", user.provider)
+        }
+        if (writableDatabase.update("users", values, "email = ?", arrayOf(email)) == 0) {
+            values.put("email", email)
+            writableDatabase.insert("users", null, values)
+        }
+        writableDatabase.insertWithOnConflict(
+            "user_settings", null, ContentValues().apply { put("user_email", email) },
+            SQLiteDatabase.CONFLICT_IGNORE
+        )
+    }
+
     fun getUser(email: String): User? {
         readableDatabase.rawQuery(
             "SELECT id, name, email, phone, role, provider FROM users WHERE email = ?",
@@ -1313,6 +1809,13 @@ class DatabaseHelper(context: Context) :
     fun updateRole(email: String, role: String): Boolean =
         writableDatabase.update(
             "users", ContentValues().apply { put("role", role) },
+            "email = ?", arrayOf(email.lowercase())
+        ) > 0
+
+    /** Keeps the local copy in step after a reset done through the emailed link. */
+    fun setPassword(email: String, newPassword: String): Boolean =
+        writableDatabase.update(
+            "users", ContentValues().apply { put("password_hash", PasswordHasher.hash(newPassword)) },
             "email = ?", arrayOf(email.lowercase())
         ) > 0
 
@@ -1464,399 +1967,5 @@ class DatabaseHelper(context: Context) :
         writableDatabase.insertWithOnConflict(
             "user_settings", null, cv, SQLiteDatabase.CONFLICT_REPLACE
         )
-    }
-}
-
-// =====================================================================================
-//  ONLINE AUTHENTICATION + API + DATABASE  (Firebase REST)
-// =====================================================================================
-class CloudService {
-
-    data class AuthResult(
-        val success: Boolean,
-        val uid: String = "",
-        val idToken: String = "",
-        val email: String = "",
-        val displayName: String = "",
-        val error: String = ""
-    )
-
-    private val apiKey: String = AppConfig.FIREBASE_API_KEY
-    private val dbUrl: String = AppConfig.FIREBASE_DB_URL.trimEnd('/')
-    private val executor = Executors.newSingleThreadExecutor()
-    private val main = Handler(Looper.getMainLooper())
-
-    val isConfigured: Boolean
-        get() = apiKey.isNotBlank() && !apiKey.startsWith("YOUR_") &&
-                dbUrl.isNotBlank() && !dbUrl.contains("YOUR_")
-
-    fun signUp(email: String, password: String, callback: (AuthResult) -> Unit) =
-        authCall("accounts:signUp", JSONObject()
-            .put("email", email).put("password", password).put("returnSecureToken", true), callback)
-
-    fun signIn(email: String, password: String, callback: (AuthResult) -> Unit) =
-        authCall("accounts:signInWithPassword", JSONObject()
-            .put("email", email).put("password", password).put("returnSecureToken", true), callback)
-
-    fun signInWithGoogle(googleIdToken: String, callback: (AuthResult) -> Unit) =
-        authCall("accounts:signInWithIdp", JSONObject()
-            .put("postBody", "id_token=$googleIdToken&providerId=google.com")
-            .put("requestUri", "http://localhost")
-            .put("returnIdpCredential", true)
-            .put("returnSecureToken", true), callback)
-
-    private fun authCall(endpoint: String, body: JSONObject, callback: (AuthResult) -> Unit) {
-        if (!isConfigured) {
-            callback(AuthResult(false, error = "Online service not configured"))
-            return
-        }
-        executor.execute {
-            val result = try {
-                val url = "https://identitytoolkit.googleapis.com/v1/$endpoint?key=$apiKey"
-                val (code, text) = request("POST", url, body.toString())
-                val json = JSONObject(text)
-                if (code in 200..299) {
-                    AuthResult(
-                        true,
-                        uid = json.optString("localId"),
-                        idToken = json.optString("idToken"),
-                        email = json.optString("email"),
-                        displayName = json.optString("displayName")
-                    )
-                } else {
-                    AuthResult(false, error = json.optJSONObject("error")?.optString("message") ?: "Request failed")
-                }
-            } catch (e: Exception) {
-                AuthResult(false, error = e.message ?: "Network error")
-            }
-            main.post { callback(result) }
-        }
-    }
-
-    fun put(path: String, data: JSONObject, idToken: String, callback: ((Boolean) -> Unit)? = null) =
-        write("PUT", path, data, idToken, callback)
-
-    fun push(path: String, data: JSONObject, idToken: String, callback: ((Boolean) -> Unit)? = null) =
-        write("POST", path, data, idToken, callback)
-
-    private fun write(method: String, path: String, data: JSONObject, idToken: String, callback: ((Boolean) -> Unit)?) {
-        if (!isConfigured || idToken.isBlank()) {
-            callback?.invoke(false)
-            return
-        }
-        executor.execute {
-            val ok = try {
-                val (code, _) = request(method, "$dbUrl/$path.json?auth=$idToken", data.toString())
-                code in 200..299
-            } catch (e: Exception) {
-                false
-            }
-            if (callback != null) main.post { callback(ok) }
-        }
-    }
-
-    private fun request(method: String, url: String, body: String): Pair<Int, String> {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        try {
-            conn.requestMethod = method
-            conn.connectTimeout = 10000
-            conn.readTimeout = 10000
-            conn.doOutput = true
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader()?.use(BufferedReader::readText) ?: "{}"
-            return Pair(code, text)
-        } finally {
-            conn.disconnect()
-        }
-    }
-}
-
-// =====================================================================================
-//  OAUTH2 / OPENID CONNECT SSO ASSERTION PROVIDER (Signed JWT & Auth Code Generator)
-// =====================================================================================
-object SsoTokenProvider {
-
-    data class SsoAssertion(
-        val authCode: String,
-        val jwtToken: String,
-        val email: String,
-        val name: String,
-        val role: String,
-        val issuer: String,
-        val isValidSignature: Boolean
-    )
-
-    private const val SECRET_KEY = "ShammahChurchSsoSecretKeyForSigningJwtTokens"
-
-    fun generateAssertion(email: String, name: String, role: String): SsoAssertion {
-        val authCode = "AUTH_CODE_" + java.util.UUID.randomUUID().toString().replace("-", "").take(16).uppercase()
-        val header = JSONObject().put("alg", "HS256").put("typ", "JWT").toString()
-
-        val iat = System.currentTimeMillis() / 1000
-        val exp = iat + 86400
-        val payload = JSONObject()
-            .put("iss", "https://sso.shammahchurch.org/oauth2/v2.0")
-            .put("sub", "user_" + Math.abs(email.hashCode()))
-            .put("aud", "shammah-mobile-app")
-            .put("email", email)
-            .put("name", name)
-            .put("role", role)
-            .put("provider", "google-oidc")
-            .put("iat", iat)
-            .put("exp", exp)
-            .put("nonce", java.util.UUID.randomUUID().toString().take(8))
-            .toString()
-
-        val headerB64 = Base64.encodeToString(header.toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
-        val payloadB64 = Base64.encodeToString(payload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
-        val unsignedToken = "$headerB64.$payloadB64"
-
-        val signatureB64 = sign(unsignedToken, SECRET_KEY)
-        val jwtToken = "$unsignedToken.$signatureB64"
-
-        val isValid = verifySignature(jwtToken, SECRET_KEY)
-
-        return SsoAssertion(
-            authCode = authCode,
-            jwtToken = jwtToken,
-            email = email,
-            name = name,
-            role = role,
-            issuer = "https://sso.shammahchurch.org/oauth2/v2.0",
-            isValidSignature = isValid
-        )
-    }
-
-    private fun sign(data: String, secret: String): String {
-        return try {
-            val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-            val key = javax.crypto.spec.SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256")
-            mac.init(key)
-            val hash = mac.doFinal(data.toByteArray(Charsets.UTF_8))
-            Base64.encodeToString(hash, Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING)
-        } catch (e: Exception) {
-            "signature_error"
-        }
-    }
-
-    fun verifySignature(jwt: String, secret: String): Boolean {
-        val parts = jwt.split(".")
-        if (parts.size != 3) return false
-        val expectedSig = sign("${parts[0]}.${parts[1]}", secret)
-        return expectedSig == parts[2]
-    }
-}
-
-// =====================================================================================
-//  SINGLE SIGN-ON  ("Sign in with Google" via Android Credential Manager & YouTube App)
-// =====================================================================================
-object GoogleSso {
-
-    data class GoogleAccount(
-        val idToken: String,
-        val email: String,
-        val displayName: String,
-        val role: String = "Member"
-    )
-
-    fun signIn(
-        activity: Activity,
-        webClientId: String,
-        onSuccess: (GoogleAccount) -> Unit,
-        onFail: (String) -> Unit
-    ) {
-        if (!webClientId.isBlank() && !webClientId.startsWith("YOUR_")) {
-            try {
-                val option = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId(webClientId)
-                    .build()
-                val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
-
-                CredentialManager.create(activity).getCredentialAsync(
-                    activity,
-                    request,
-                    CancellationSignal(),
-                    androidx.core.content.ContextCompat.getMainExecutor(activity),
-                    object : CredentialManagerCallback<GetCredentialResponse, GetCredentialException> {
-                        override fun onResult(result: GetCredentialResponse) {
-                            val credential = result.credential
-                            if (credential is CustomCredential &&
-                                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                            ) {
-                                try {
-                                    val google = GoogleIdTokenCredential.createFrom(credential.data)
-                                    val account = GoogleAccount(
-                                        google.idToken,
-                                        google.id,
-                                        google.displayName ?: google.id.substringBefore("@")
-                                    )
-                                    showYouTubeApprovalDialog(activity, account, onSuccess, onFail)
-                                    return
-                                } catch (e: Exception) {}
-                            }
-                            showCustomGoogleYouTubeDialog(activity, onSuccess, onFail)
-                        }
-
-                        override fun onError(e: GetCredentialException) {
-                            showCustomGoogleYouTubeDialog(activity, onSuccess, onFail)
-                        }
-                    }
-                )
-                return
-            } catch (e: Exception) {}
-        }
-
-        showCustomGoogleYouTubeDialog(activity, onSuccess, onFail)
-    }
-
-    private fun showCustomGoogleYouTubeDialog(
-        activity: Activity,
-        onSuccess: (GoogleAccount) -> Unit,
-        onFail: (String) -> Unit
-    ) {
-        val context = activity
-        val layout = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(50, 40, 50, 20)
-        }
-
-        val infoText = TextView(context).apply {
-            text = "OAUTH2 / OPENID CONNECT SINGLE SIGN-ON\n\nIssuer: https://sso.shammahchurch.org/oauth2/v2.0\nClient ID: shammah-mobile-android\nScopes: openid profile email church.role youtube.access\n\nEnter your Gmail address and select your role below:"
-            setTextColor(Color.WHITE)
-            textSize = 13f
-            setPadding(0, 0, 0, 20)
-        }
-        layout.addView(infoText)
-
-        val emailInput = EditText(context).apply {
-            hint = "Gmail Address (e.g. pastor@gmail.com)"
-            inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.parseColor("#C9B8C3"))
-            setBackgroundColor(Color.parseColor("#2A1427"))
-            setPadding(30, 30, 30, 30)
-        }
-        layout.addView(emailInput)
-
-        val nameInput = EditText(context).apply {
-            hint = "Full Name (Optional)"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.parseColor("#C9B8C3"))
-            setBackgroundColor(Color.parseColor("#2A1427"))
-            setPadding(30, 30, 30, 30)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 20 }
-        }
-        layout.addView(nameInput)
-
-        val roleLabel = TextView(context).apply {
-            text = "Select Account Role:"
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            setPadding(0, 20, 0, 10)
-        }
-        layout.addView(roleLabel)
-
-        val roles = arrayOf("Member", "Pastor", "Volunteer", "Staff")
-        val roleSpinner = Spinner(context).apply {
-            adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item, roles)
-            setBackgroundColor(Color.parseColor("#2A1427"))
-            setPadding(20, 20, 20, 20)
-        }
-        layout.addView(roleSpinner)
-
-        val youtubeBtn = Button(context).apply {
-            text = "▶ OPEN YOUTUBE APP"
-            setBackgroundColor(Color.parseColor("#FF0000"))
-            setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 25 }
-            setOnClickListener {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/"))
-                    activity.startActivity(intent)
-                    Toast.makeText(activity, "Opening YouTube App...", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(activity, "YouTube Link: https://www.youtube.com/", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-        layout.addView(youtubeBtn)
-
-        AlertDialog.Builder(context)
-            .setTitle("G  Sign in with Gmail (SSO)")
-            .setView(layout)
-            .setPositiveButton("APPROVE") { _, _ ->
-                val typedEmail = emailInput.text.toString().trim().lowercase()
-                var typedName  = nameInput.text.toString().trim()
-                val selectedRole = roles[roleSpinner.selectedItemPosition]
-
-                if (!Patterns.EMAIL_ADDRESS.matcher(typedEmail).matches()) {
-                    Toast.makeText(activity, "Enter a valid Gmail email address", Toast.LENGTH_SHORT).show()
-                    onFail("Invalid Gmail address")
-                    return@setPositiveButton
-                }
-
-                if (typedName.isBlank()) {
-                    typedName = typedEmail.substringBefore("@").replace(".", " ")
-                        .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-                }
-
-                val assertion = SsoTokenProvider.generateAssertion(typedEmail, typedName, selectedRole)
-                Toast.makeText(activity, "▶ Single Sign-On Approved! Welcome ${assertion.name}", Toast.LENGTH_SHORT).show()
-                onSuccess(GoogleAccount(assertion.jwtToken, assertion.email, assertion.name, assertion.role))
-            }
-            .setNegativeButton("DECLINE") { _, _ ->
-                Toast.makeText(activity, "SSO Authorization Declined", Toast.LENGTH_SHORT).show()
-                onFail("SSO Authorization Declined")
-            }
-            .setCancelable(false)
-            .show()
-    }
-
-    private fun showYouTubeApprovalDialog(
-        activity: Activity,
-        account: GoogleAccount,
-        onSuccess: (GoogleAccount) -> Unit,
-        onFail: (String) -> Unit
-    ) {
-        val message = """
-            GOOGLE & YOUTUBE SINGLE SIGN-ON
-            
-            👤 Selected Google Account:
-            ${account.displayName} (${account.email})
-            
-            ▶ YouTube Channel & Live Access:
-            Pending Approval
-            
-            Tap 'APPROVE' to grant YouTube channel permission and proceed to the daily Bible verse, or tap 'DECLINE' to return to the login page.
-        """.trimIndent()
-
-        AlertDialog.Builder(activity)
-            .setTitle("▶ YouTube Account Approval")
-            .setMessage(message)
-            .setPositiveButton("APPROVE") { _, _ ->
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/"))
-                    activity.startActivity(intent)
-                } catch (e: Exception) {}
-                Toast.makeText(activity, "▶ YouTube Account Approved! Loading Daily Bible Verse...", Toast.LENGTH_SHORT).show()
-                onSuccess(account)
-            }
-            .setNegativeButton("DECLINE") { _, _ ->
-                Toast.makeText(activity, "YouTube approval declined. Returning to login page.", Toast.LENGTH_SHORT).show()
-                onFail("YouTube approval declined")
-            }
-            .setCancelable(false)
-            .show()
     }
 }
