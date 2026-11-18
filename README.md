@@ -165,6 +165,8 @@ Changes since the prototype. Features marked **(innovative)** are the new ideas 
 - GitHub mirror: https://github.com/OmphileMoale/shammah-android-app
 - Azure Repos (app): https://dev.azure.com/ST10455873/XISD6329-Shammah-Urban-Church-CMES/_git/shammah-android-app
 - Azure Repos (website): https://dev.azure.com/ST10455873/XISD6329-Shammah-Urban-Church-CMES/_git/shammah-website
--## Demo video
 
-Watch the demo video here: [Shammah Android App Demo](https://drive.google.com/file/d/1oU9cDYekwwAL7JiSn-5AlPDCG9MWJLLy/view?usp=drivesdk)
+## Demo video
+
+Watch the demo video here:
+[Shammah Android App Demo](https://drive.google.com/file/d/1oU9cDYekwwAL7JiSn-5AlPDCG9MWJLLy/view?usp=drivesdk)
